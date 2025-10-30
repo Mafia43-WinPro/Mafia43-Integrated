@@ -135,6 +135,11 @@ BOOL CnightDlg::OnInitDialog()
 		{4, L"강감찬", true}
 	};
 
+	InitPlayerList();   // ✅ 반드시 호출해야 화면에 보임
+
+	m_timeLeftSec = 30; // 예시
+	SetTimer(1, 1000, nullptr);
+
 
 
 
@@ -196,26 +201,90 @@ HCURSOR CnightDlg::OnQueryDragIcon()
 void CnightDlg::OnBnClickedConfirm()
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	int sel = m_cmbAction.GetCurSel();
+	CString action;
+	if (sel >= 0)
+		m_cmbAction.GetLBText(sel, action);
+	else
+		action = L"NONE";
+
+	// ② 대상 선택
+	int item = m_playerList.GetNextItem(-1, LVNI_SELECTED);
+	int targetId = 0;
+	if (item != -1)
+		targetId = (int)m_playerList.GetItemData(item);
+
+	// ③ 유효성 체크
+	if (action != L"NONE" && targetId == 0) {
+		AfxMessageBox(L"대상을 선택하세요!");
+		return;
+	}
+
+	// ④ 로그 출력 (또는 서버 전송)
+	CString log;
+	log.Format(L"행동 제출 → [%s] 대상 ID: %d\r\n", action, targetId);
+	m_chatView.ReplaceSel(log);
+	
 }
 
 void CnightDlg::OnClickedSend()
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	CString msg;
+	m_chatInput.GetWindowTextW(msg);
+	msg.Trim();
+	if (msg.IsEmpty()) return;
+
+	CString line;
+	line.Format(L"[나] %s\r\n", msg);
+	m_chatView.ReplaceSel(line);
+
+	m_chatInput.SetWindowTextW(L""); // 입력창 비우기
 }
 
 void CnightDlg::OnItemchangedPlayerList(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	LPNMLISTVIEW p = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+	if ((p->uChanged & LVIF_STATE) && (p->uNewState & LVIS_SELECTED)) {
+		int idx = p->iItem;
+		if (idx >= 0) {
+			m_selectedTargetId = (int)m_playerList.GetItemData(idx);
+
+			// 미리보기 라벨 갱신
+			CString name = m_playerList.GetItemText(idx, 0);
+			CString preview;
+			preview.Format(L"선택 대상: %s", name);
+			m_lblPreview.SetWindowTextW(preview);
+		}
+	}
+
 	*pResult = 0;
 }
 
 void CnightDlg::OnTimer(UINT_PTR nIDEvent)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	if (nIDEvent == 1 && m_timeLeftSec > 0)
+	{
+		--m_timeLeftSec;
+
+		CString s;
+		s.Format(L"남은 시간: %02d:%02d", m_timeLeftSec / 60, m_timeLeftSec % 60);
+		m_lblTimer.SetWindowTextW(s);
+
+		if (m_timeLeftSec == 0)
+		{
+			KillTimer(1);
+			CString log;
+			log.Format(L"시간 만료 → 자동 NONE 행동\r\n");
+			m_chatView.ReplaceSel(log);
+		}
+	}
 
 	CDialogEx::OnTimer(nIDEvent);
 }
+
 
 void CnightDlg::OnEnChangeReChatview()
 {
@@ -230,4 +299,21 @@ void CnightDlg::OnEnChangeReChatview()
 void CnightDlg::OnClickedSkip()
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	CString log;
+	log.Format(L"행동 건너뛰기 (NONE)\r\n");
+	m_chatView.ReplaceSel(log);
+}
+
+void CnightDlg::InitPlayerList()
+{
+	m_playerList.DeleteAllItems();
+
+	for (const auto& p : m_players)
+	{
+		if (!p.alive)
+			continue; // ✨ 사망자는 표시 안 함
+
+		int row = m_playerList.InsertItem(m_playerList.GetItemCount(), p.name);
+		m_playerList.SetItemData(row, p.id);
+	}
 }
