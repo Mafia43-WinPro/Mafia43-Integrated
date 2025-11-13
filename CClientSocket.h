@@ -17,7 +17,7 @@ public:
     CClientSocket();
     virtual ~CClientSocket();
 
-    CMafia43Dlg* m_pDlg; // 메인 다이얼로그를 가리킬 포인터
+    CWnd* m_pDlg; // 메인 다이얼로그를 가리킬 포인터
     CStringA m_strBuffer; // 데이터 수신용 임시 버퍼
 
     // MFC 마법사가 생성하는 올바른 함수 원형들

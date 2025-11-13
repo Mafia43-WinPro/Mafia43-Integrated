@@ -1,5 +1,7 @@
-﻿// Microsoft Visual C++ generated resource script.
+// Microsoft Visual C++ generated resource script.
 //
+#pragma code_page(65001)
+
 #include "resource.h"
 
 #define APSTUDIO_READONLY_SYMBOLS
@@ -113,7 +115,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFR
 CAPTION "역할 확인"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    CONTROL         AFX_IDC_STRIKEOUT,IDC_PIC_ROLE,"Static",SS_BITMAP,7,7,658,364
+    CONTROL         IDC_BUTTON_EXIT,IDC_PIC_ROLE,"Static",SS_BITMAP,7,7,658,364
     LTEXT           "당신의 역할은",IDC_STATIC,45,194,46,9
     LTEXT           "역할 대기 중...",IDC_STATIC_ROLENAME,95,194,68,9
     PUSHBUTTON      "확인",IDC_BUTTON_ROLE_CONFIRM,166,189,23,14
@@ -126,6 +128,20 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "확인",IDOK,199,156,50,14
     PUSHBUTTON      "취소",IDCANCEL,253,156,50,14
+END
+
+IDD_DAY DIALOGEX 0, 0, 310, 177
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LIST_VOTE,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,17,18,73,121
+    EDITTEXT        IDC_EDIT_CHAT,187,133,101,28,ES_AUTOHSCROLL
+    PUSHBUTTON      "전송",IDC_BUTTON_SEND_CHAT,95,85,38,12
+    PUSHBUTTON      "투표하기",IDC_BUTTON_VOTE,137,85,42,12
+    LTEXT           "역할:",IDC_STATIC,19,7,70,8
+    LTEXT           "남은 시간: 00:00",IDC_STATIC_TIME,186,7,99,8
+    CONTROL         "",IDC_RICH_CHAT,"RichEdit20W",ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP,186,24,102,101
 END
 
 
@@ -208,6 +224,14 @@ BEGIN
         TOPMARGIN, 7
         BOTTOMMARGIN, 170
     END
+
+    IDD_DAY, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 303
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 170
+    END
 END
 #endif    // APSTUDIO_INVOKED
 
@@ -228,6 +252,11 @@ BEGIN
 END
 
 IDD_NIGHT_DIALOG AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+IDD_DAY AFX_DIALOG_LAYOUT
 BEGIN
     0
 END
@@ -285,5 +314,4 @@ LANGUAGE 18, 1
 
 /////////////////////////////////////////////////////////////////////////////
 #endif    // not APSTUDIO_INVOKED
-
 

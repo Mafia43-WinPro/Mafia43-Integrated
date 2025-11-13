@@ -42,6 +42,9 @@
     <ClInclude Include="CClientSocket.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="CDayDlg.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Mafia43.cpp">
@@ -60,6 +63,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="CClientSocket.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="CDayDlg.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
@@ -105,6 +111,21 @@
       <Filter>리소스 파일</Filter>
     </Image>
     <Image Include="..\..\..\Desktop\윈프실\mafia_login_final.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="res\mafia_g.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="res\police_final.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="res\doctor_final.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="res\citizen_final.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="res\mafia_login_final.bmp">
       <Filter>리소스 파일</Filter>
     </Image>
   </ItemGroup>

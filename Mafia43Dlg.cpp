@@ -8,7 +8,7 @@
 #include "afxdialogex.h"
 #include "CRoleAssignDlg.h" 
 #include "CNightDlg.h"
-// #include "CDayDlg.h" // (낮 화면 추가 시)
+#include "CDayDlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -500,8 +500,12 @@ void CMafia43Dlg::ParseRole(const CStringA& strJsonA)
 }
 
 
+/**
+ * @brief [수정] 게임 시작 및 밤/낮 순환(Game Loop) 처리
+ */
 LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 {
+	// 1. 역할 정보가 올 때까지 0.1초 대기 (기존 로직)
 	if (m_strMyRole.IsEmpty())
 	{
 		SetTimer(1U, 100, NULL);
@@ -509,29 +513,74 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 	}
 	KillTimer(1U);
 
+	// 2. 역할 배정 팝업
 	CRoleAssignDlg dlgRole;
 	dlgRole.m_strRoleToShow = m_strMyRole;
 	dlgRole.DoModal();
 
+	// 3. 메인 로비 숨김
 	ShowWindow(SW_HIDE);
 
-	CNightDlg dlgNight;
-	dlgNight.m_strMyNickname = m_strNickname;
-	dlgNight.m_strMyRole = m_strMyRole;
-	dlgNight.m_pSocket = &m_Socket;
-	dlgNight.DoModal();
+	// 4. [신규] 게임 순환(Loop) 시작
+	bool bGameInProgress = true;
+	while (bGameInProgress)
+	{
+		// --- 4-1. 밤(NIGHT) 페이즈 ---
+		CNightDlg dlgNight;
+		dlgNight.m_strMyNickname = m_strNickname;
+		dlgNight.m_strMyRole = m_strMyRole;
+		dlgNight.m_pSocket = &m_Socket;
 
-	// (밤/낮 로직...)
+		// [중요] 소켓이 메시지를 보낼 대상을 '밤 다이얼로그'로 설정
+		m_Socket.m_pDlg = &dlgNight;
 
-	ShowWindow(SW_SHOW);
+		INT_PTR nResponse = dlgNight.DoModal();
 
+		// OnCancel() (게임 종료 메시지 수신 등)로 닫히면 루프 종료
+		if (nResponse != IDOK)
+		{
+			bGameInProgress = false;
+			break;
+		}
+
+		// --- 4-2. 낮(DAY) 페이즈 ---
+		CDayDlg dlgDay;
+		dlgDay.m_pSocket = &m_Socket;
+		dlgDay.m_strMyUID = m_strMyUID; // UID 전달
+		dlgDay.m_strMyNickname = m_strNickname;
+		dlgDay.m_strMyRole = m_strMyRole;
+
+		// [중요] 소켓이 메시지를 보낼 대상을 '낮 다이얼로그'로 설정
+		m_Socket.m_pDlg = &dlgDay;
+
+		nResponse = dlgDay.DoModal();
+
+		// OnCancel() (게임 종료 메시지 수신 등)로 닫히면 루프 종료
+		if (nResponse != IDOK)
+		{
+			bGameInProgress = false;
+			break;
+		}
+	} // end of while(bGameInProgress)
+
+	// 5. 게임 종료 후 뒷정리
+
+	// [중요] 소켓이 메시지를 보낼 대상을 다시 '메인 로비'로 복구
+	m_Socket.m_pDlg = this;
+
+	ShowWindow(SW_SHOW); // 메인 로비 다시 표시
+
+	// 변수 초기화
 	m_strMyRole = _T("");
 	m_strRoomID = _T("");
 	m_staticRoomInfo.SetWindowText(_T("게임 종료. 방을 선택하세요."));
+
+	// 버튼 활성화
 	GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
 	GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);
 	GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(FALSE);
 
+	// 방 목록 갱신
 	m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
 
 	return 0;

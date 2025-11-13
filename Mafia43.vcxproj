@@ -184,6 +184,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CClientSocket.h" />
+    <ClInclude Include="CDayDlg.h" />
     <ClInclude Include="CNightDlg.h" />
     <ClInclude Include="CRoleAssignDlg.h" />
     <ClInclude Include="framework.h" />
@@ -195,6 +196,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CClientSocket.cpp" />
+    <ClCompile Include="CDayDlg.cpp" />
     <ClCompile Include="CNightDlg.cpp" />
     <ClCompile Include="CRoleAssignDlg.cpp" />
     <ClCompile Include="Mafia43.cpp">
@@ -226,7 +228,12 @@
     <Image Include="..\..\..\Desktop\윈프실\mafia_pic.bmp" />
     <Image Include="..\..\..\Desktop\윈프실\police_final.bmp" />
     <Image Include="..\..\..\Desktop\윈프실\police_g.bmp" />
+    <Image Include="res\citizen_final.bmp" />
+    <Image Include="res\doctor_final.bmp" />
     <Image Include="res\Mafia43.ico" />
+    <Image Include="res\mafia_g.bmp" />
+    <Image Include="res\mafia_login_final.bmp" />
+    <Image Include="res\police_final.bmp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

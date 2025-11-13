@@ -13,6 +13,7 @@
 #define IDB_ROLE_DOCTOR                 145
 #define IDB_ROLE_CITIZEN                146
 #define IDB_BACKGROUND_MAIN             147
+#define IDD_DAY                         148
 #define IDC_LIST_PLAYERS_IN_ROOM        1000
 #define IDC_BUTTON_START                1001
 #define IDC_EDIT_ROOM_TITLE             1002
@@ -29,14 +30,21 @@
 #define IDC_EDIT_NICKNAME               1015
 #define IDC_LIST1                       1016
 #define IDC_LIST_PLAYERS                1016
+#define IDC_LIST_VOTE                   1017
+#define IDC_EDIT_CHAT                   1018
+#define IDC_BUTTON_SEND_CHAT            1019
+#define IDC_BUTTON_VOTE                 1020
+#define IDC_COMBO1                      1022
+#define IDC_RICH_CHAT                   1023
+#define IDC_STATIC_TIME                 1024
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        148
+#define _APS_NEXT_RESOURCE_VALUE        150
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1017
+#define _APS_NEXT_CONTROL_VALUE         1025
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
