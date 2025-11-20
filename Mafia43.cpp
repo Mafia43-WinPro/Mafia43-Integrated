@@ -78,7 +78,7 @@ BOOL CMafia43App::InitInstance()
 	if (nResponse == IDOK)
 	{
 		// TODO: 여기에 [확인]을 클릭하여 대화 상자가 없어질 때 처리할
-		//  코드를 배치합니다.
+		//  코드를 배치합니다.	
 	}
 	else if (nResponse == IDCANCEL)
 	{
