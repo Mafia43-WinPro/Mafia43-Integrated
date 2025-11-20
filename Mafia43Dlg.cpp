@@ -489,7 +489,7 @@ void CMafia43Dlg::ParseRole(const CStringA& strJsonA)
 	int nPos = strJsonA.Find("\"role\": \""); // (공백 추가)
 	if (nPos != -1)
 	{
-		CStringA strRole = strJsonA.Mid(nPos + 10); // (8 -> 10)
+		CStringA strRole = strJsonA.Mid(nPos + 9); // (8 -> 10->9)
 		strRole = strRole.Left(strRole.Find('\"'));
 
 		if (strRole == "MAFIA") m_strMyRole = _T("마피아");

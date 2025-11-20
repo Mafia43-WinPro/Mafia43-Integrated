@@ -118,6 +118,12 @@ void CDayDlg::UpdateTimerDisplay()
  */
 void CDayDlg::AppendTextToRichEdit(CString strText, COLORREF color)
 {
+	//줄바꿈
+	if (strText.Right(2) != _T("\r\n"))
+	{
+		strText += _T("\r\n");
+	}
+
 	CHARFORMAT cf;
 	ZeroMemory(&cf, sizeof(CHARFORMAT));
 	cf.cbSize = sizeof(CHARFORMAT);
@@ -235,16 +241,16 @@ void CDayDlg::ParseChat(const CStringA& strJsonA)
 
 	const char* pFrom = strstr(pData, "\"from\": \"");
 	if (!pFrom) return;
-	const char* pFromEnd = strstr(pFrom + 10, "\"");
+	const char* pFromEnd = strstr(pFrom + 9, "\"");
 	if (!pFromEnd) return;
 
 	const char* pText = strstr(pFromEnd, "\"text\": \"");
 	if (!pText) return;
-	const char* pTextEnd = strstr(pText + 10, "\"");
+	const char* pTextEnd = strstr(pText + 9, "\"");
 	if (!pTextEnd) return;
 
-	CStringA strFromA(pFrom + 10, pFromEnd - (pFrom + 10));
-	CStringA strTextA(pText + 10, pTextEnd - (pText + 10));
+	CStringA strFromA(pFrom + 9, pFromEnd - (pFrom + 9));
+	CStringA strTextA(pText + 9, pTextEnd - (pText + 9));
 
 	CString strMsg;
 	strMsg.Format(_T("%s: %s\r\n"), CStrA_to_CStr(strFromA), CStrA_to_CStr(strTextA));

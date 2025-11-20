@@ -34,9 +34,18 @@
 #define IDC_EDIT_CHAT                   1018
 #define IDC_BUTTON_SEND_CHAT            1019
 #define IDC_BUTTON_VOTE                 1020
-#define IDC_COMBO1                      1022
 #define IDC_RICH_CHAT                   1023
 #define IDC_STATIC_TIME                 1024
+#define IDC_CMB_ACTION                  1025
+#define IDC_BTN_CONFIRM                 1026
+#define IDC_BTN_SKIP                    1027
+#define IDC_BTN_SEND                    1028
+#define IDC_LBL_ROLE                    1029
+#define IDC_LBL_TIMER                   1030
+#define IDC_LBL_PREVIEW                 1031
+#define IDC_RE_CHATVIEW                 1033
+#define IDC_EDIT1                       1034
+#define IDC_EDT_CHAT                    1034
 
 // Next default values for new objects
 // 
@@ -44,7 +53,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        150
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1025
+#define _APS_NEXT_CONTROL_VALUE         1035
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
