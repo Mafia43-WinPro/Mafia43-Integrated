@@ -311,36 +311,50 @@ LRESULT CMafia43Dlg::OnRecvMsg(WPARAM wParam, LPARAM lParam)
 
 void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 {
-	// "op": "HELLO" (공백 포함)
-	if (strJsonA.Find("\"op\": \"HELLO\"") != -1)
-	{
-		ParseHello(strJsonA);
-	}
-	else if (strJsonA.Find("\"op\": \"ROOM_LIST\"") != -1)
-	{
-		ParseRoomList(strJsonA);
-	}
-	else if (strJsonA.Find("\"op\": \"ROOM_STATE\"") != -1)
-	{
-		ParseRoomState(strJsonA);
-	}
-	else if (strJsonA.Find("\"op\": \"ROLE\"") != -1)
-	{
-		ParseRole(strJsonA);
-	}
-	else if (strJsonA.Find("\"op\": \"PHASE\"") != -1)
-	{
-		if (strJsonA.Find("\"phase\": \"NIGHT\"") != -1)
-		{
-			PostMessage(WM_USER_GAME_START);
-		}
-	}
-	else if (strJsonA.Find("\"op\": \"ERROR\"") != -1)
-	{
-		GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
-		GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);
-		AfxMessageBox(CStrA_to_CStr(strJsonA));
-	}
+    // "op": "HELLO" (공백 포함)
+    if (strJsonA.Find("\"op\": \"HELLO\"") != -1)
+    {
+        ParseHello(strJsonA);
+    }
+    else if (strJsonA.Find("\"op\": \"ROOM_LIST\"") != -1)
+    {
+        ParseRoomList(strJsonA);
+    }
+    else if (strJsonA.Find("\"op\": \"ROOM_STATE\"") != -1)
+    {
+        ParseRoomState(strJsonA);
+    }
+    // ★ 추가: JOIN_ROOM 성공 처리
+    else if (strJsonA.Find("\"op\": \"JOIN_ROOM\"") != -1 || 
+             strJsonA.Find("\"op\": \"JOINED\"") != -1)
+    {
+        // 방 입장 성공 시 방 상태 요청
+        m_Socket.SendJson("{\"op\":\"GET_ROOM_STATE\"}");
+    }
+    // ★ 추가: CREATE_ROOM 성공 처리
+    else if (strJsonA.Find("\"op\": \"CREATE_ROOM\"") != -1 || 
+             strJsonA.Find("\"op\": \"CREATED\"") != -1)
+    {
+        // 방 생성 성공 시 방 상태 요청
+        m_Socket.SendJson("{\"op\":\"GET_ROOM_STATE\"}");
+    }
+    else if (strJsonA.Find("\"op\": \"ROLE\"") != -1)
+    {
+        ParseRole(strJsonA);
+    }
+    else if (strJsonA.Find("\"op\": \"PHASE\"") != -1)
+    {
+        if (strJsonA.Find("\"phase\": \"NIGHT\"") != -1)
+        {
+            PostMessage(WM_USER_GAME_START);
+        }
+    }
+    else if (strJsonA.Find("\"op\": \"ERROR\"") != -1)
+    {
+        GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
+        GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);
+        AfxMessageBox(CStrA_to_CStr(strJsonA));
+    }
 }
 
 void CMafia43Dlg::ParseHello(const CStringA& strJsonA)
