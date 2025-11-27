@@ -16,9 +16,11 @@ class CNightDlg : public CDialogEx
 	DECLARE_DYNAMIC(CNightDlg)
 
 public:
-	//CNightDlg(CWnd* pParent = nullptr);   // 표준 생성자입니다.
-	CNightDlg(const std::vector<PlayerInfo>& players, CWnd* pParent = nullptr);   // 표준 생성자입니다.
+	// 생성자
+	CNightDlg(const std::vector<PlayerInfo>& players, CWnd* pParent = nullptr);
 	virtual ~CNightDlg();
+
+	// 소켓 설정 함수
 	void SetSocket(CClientSocket* pSocket) { m_pSocket = pSocket; }
 	bool m_bActionSubmitted;
 
@@ -40,7 +42,7 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 
-	// 팀원분이 작성한 핸들러들
+	// 핸들러 함수들
 	afx_msg void OnBnClickedConfirm();
 	afx_msg void OnClickedSend();
 	afx_msg void OnClickedSkip();
@@ -48,7 +50,12 @@ protected:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnEnChangeReChatview();
 
-	afx_msg LRESULT OnReceiveMsg(WPARAM wParam, LPARAM lParam); //서버 메시지 수신 함수 선언
+	// [필수] 서버 메시지 수신 함수
+	afx_msg LRESULT OnReceiveMsg(WPARAM wParam, LPARAM lParam);
+
+	// [선택] 실수로 더블클릭해서 생긴 함수라면 지워도 되지만, 
+	// cpp 파일에 빈 함수를 만들어뒀으므로 에러 방지용으로 놔둡니다.
+	afx_msg void OnBnClickedButton2();
 
 	DECLARE_MESSAGE_MAP()
 
@@ -59,15 +66,14 @@ public:
 	CString m_strMyRole;
 
 	// --- [UI 컨트롤 변수] ---
-	// (주의: 리소스 뷰에서 이 ID들을 가진 컨트롤을 만들어야 합니다!)
 	CListCtrl m_playerList;      // IDC_LIST_PLAYERS
 	CComboBox m_cmbAction;       // IDC_CMB_ACTION
 	CButton m_btnConfirm;        // IDC_BTN_CONFIRM
 	CStatic m_lblRole;           // IDC_LBL_ROLE
 	CStatic m_lblTimer;          // IDC_LBL_TIMER
 	CStatic m_lblPreview;        // IDC_LBL_PREVIEW
-	CRichEditCtrl m_chatView;    // IDC_RE_CHATVIEW (채팅 내용)
-	CEdit m_chatInput;           // IDC_EDT_CHAT (채팅 입력)
+	CRichEditCtrl m_chatView;    // IDC_RE_CHATVIEW
+	CEdit m_chatInput;           // IDC_EDT_CHAT
 	CButton m_btnSend;           // IDC_BTN_SEND
 
 	// --- [데이터 변수] ---
@@ -77,6 +83,5 @@ public:
 
 	// 헬퍼 함수
 	void InitPlayerList();
-	void AppendChat(CString strMsg); // 채팅창 출력 헬퍼
-	afx_msg void OnBnClickedButton2();
+	void AppendChat(CString strMsg);
 };

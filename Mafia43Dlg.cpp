@@ -745,3 +745,5 @@ CString CMafia43Dlg::CStrA_to_CStr(const CStringA& strA)
 	CA2T utf8(strA, CP_UTF8);
 	return CString(utf8);
 }
+void CMafia43Dlg::OnLvnItemchangedListPlayers(NMHDR* pNMHDR, LRESULT* pResult) { *pResult = 0; }
+void CMafia43Dlg::OnStnClickedPicBackground() {}
