@@ -1,8 +1,13 @@
-﻿// Mafia43Dlg.h: 헤더 파일
+// Mafia43Dlg.h: 헤더 파일
 //
 #pragma once
 #include "CClientSocket.h" // 1. CClientSocket 헤더 추가
 #include "Resource.h"
+#include <vector>
+#include "CNightDlg.h"
+
+class CNightDlg;
+
 // ▼▼▼ CClientSocket에서 보낼 사용자 정의 메시지 ID ▼▼▼
 #define WM_USER_CONNECT_SUCCESS (WM_USER + 100) // 접속 성공
 #define WM_USER_CONNECT_FAIL    (WM_USER + 101) // 접속 실패
@@ -10,6 +15,12 @@
 #define WM_USER_SERVER_CLOSE    (WM_USER + 103) // 서버 끊김
 #define WM_USER_GAME_START      (WM_USER + 104) // 게임 시작 신호
 
+struct RoomPlayerInfo {
+	CString strUID;
+	CString strName;
+	bool bIsAlive;
+	bool bIsHost;
+};
 
 // CMafia43Dlg 대화 상자
 class CMafia43Dlg : public CDialogEx
@@ -23,6 +34,8 @@ public:
 	CString m_strMyUID;     // 서버가 발급한 내 ID
 	CString m_strRoomID;    // 내가 현재 입장한 방 ID
 	CString m_strMyRole;    // 내 직업
+
+	std::vector<RoomPlayerInfo> m_vecRoomPlayers;
 
 	// --- 3. JSON 파싱 및 처리 함수 선언 ---
 	void ProcessServerMessage(CStringA strJsonA);
