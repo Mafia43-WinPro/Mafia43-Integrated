@@ -1,4 +1,4 @@
-﻿// Mafia43Dlg.cpp: 구현 파일
+// Mafia43Dlg.cpp: 구현 파일
 
 #include "pch.h"
 #include "framework.h"
@@ -269,15 +269,19 @@ void CMafia43Dlg::OnClickedButtonJoinRoom()
 
 void CMafia43Dlg::OnClickedButtonStartGame()
 {
-	// [최종 수정] 공백이나 특수문자 없이 깔끔하게 포맷팅
-	CStringA strOp = "START";
-	CStringA strPacket;
-	strPacket.Format("{\"op\":\"%s\"}", strOp);
+	// 디버깅: 방에 있는지 확인
+	if (m_strRoomID.IsEmpty())
+	{
+		AfxMessageBox(_T("[디버그] 방에 입장하지 않았습니다!"));
+		return;
+	}
 
-	// 이 시점에서 strPacket은 {"op":"START"} 딱 이것만 들어감
-	m_Socket.SendJson(strPacket);
+	// 디버깅: 전송할 메시지 확인
+	CString strDebug;
+	strDebug.Format(_T("[디버그] 전송: {\"op\":\"START\"}\n방 ID: %s"), m_strRoomID);
 
-	// 버튼 비활성화
+	AfxMessageBox(strDebug);
+	m_Socket.SendJson("{\"op\":\"START\"}");
 	GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(FALSE);
 }
 
@@ -358,7 +362,13 @@ void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 	{
 		GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
 		GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);
-		AfxMessageBox(CStrA_to_CStr(strJsonA));
+		CString strError;
+
+		strError.Format(_T("[디버그 - 서버 에러 응답]\n원본: %s\n\n받은 시각: 방 시작 버튼 클릭 후"),
+
+			CStrA_to_CStr(strJsonA));
+
+		AfxMessageBox(strError);
 		m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
 	}
 }
