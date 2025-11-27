@@ -445,7 +445,6 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 		int nColon = strJsonA.Find(':', nPos);
 		int nStart = strJsonA.Find('\"', nColon + 1);
 		int nEnd = strJsonA.Find('\"', nStart + 1);
-
 		if (nStart != -1 && nEnd != -1)
 		{
 			CStringA strRid = strJsonA.Mid(nStart + 1, nEnd - nStart - 1);
@@ -458,25 +457,31 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 	int nListStart = strJsonA.Find("\"players\":");
 	if (nListStart == -1) return;
 
-	// 대괄호 [ 다음부터 검색
 	int nSearchPos = strJsonA.Find('[', nListStart);
 	if (nSearchPos == -1) return;
 
 	int nItem = 0;
 
-	// 루프: 플레이어 객체 { ... } 하나씩 찾아서 파싱
+	// 루프: 플레이어 객체 { ... } 파싱
 	while (true)
 	{
 		int nObjStart = strJsonA.Find('{', nSearchPos);
 		if (nObjStart == -1) break;
-
 		int nObjEnd = strJsonA.Find('}', nObjStart);
 		if (nObjEnd == -1) break;
 
 		// 플레이어 한 명 데이터
 		CStringA strPlayerObj = strJsonA.Mid(nObjStart, nObjEnd - nObjStart + 1);
 
-		// 1) UID 추출
+		// ★ [핵심] 공백, 줄바꿈 싹 제거해서 깔끔하게 만듦 ★
+		// 예: "is_host" : true  ---> "is_host":true
+		CStringA strCleanObj = strPlayerObj;
+		strCleanObj.Replace(" ", "");
+		strCleanObj.Replace("\t", "");
+		strCleanObj.Replace("\r", "");
+		strCleanObj.Replace("\n", "");
+
+		// 1) UID 추출 (공백 제거된 문자열에서 찾으면 따옴표 찾기가 애매하므로 원본 사용)
 		CStringA strUid = "";
 		int kUid = strPlayerObj.Find("\"uid\"");
 		if (kUid != -1) {
@@ -496,33 +501,33 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 			if (s != -1 && e != -1) strName = strPlayerObj.Mid(s + 1, e - s - 1);
 		}
 
-		// 3) Alive 추출
+		// 3) Alive 추출 (공백 제거된 strCleanObj 사용)
 		CStringA strAlive = "false";
-		if (strPlayerObj.Find("\"alive\": true") != -1) strAlive = "true"; // 간단 검사
+		// "alive":true 패턴이 있는지 확인
+		if (strCleanObj.Find("\"alive\":true") != -1) strAlive = "true";
 
-		// 4) Is_Host 추출
+		// 4) Is_Host 추출 (공백 제거된 strCleanObj 사용)
 		CStringA strIsHost = "false";
-		if (strPlayerObj.Find("\"is_host\": true") != -1) strIsHost = "true"; // 간단 검사
+		// "is_host":true 패턴이 있는지 확인 (이제 띄어쓰기 걱정 없음)
+		if (strCleanObj.Find("\"is_host\":true") != -1) strIsHost = "true";
+
 
 		// --- 리스트 추가 ---
 		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName));
 		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive == "true" ? _T("생존") : _T("사망")));
 
-		// --- [핵심] 방장 확인 (CleanID 사용) ---
+		// --- 방장 확인 및 버튼 활성화 ---
 		if (strIsHost == "true")
 		{
-			m_listPlayersInRoom.SetItemText(nItem, 2, _T("★"));
+			m_listPlayersInRoom.SetItemText(nItem, 2, _T("★")); // 별표 찍기
 
-			// ★ 여기서 CleanID를 써서 껍데기를 다 벗기고 알맹이만 비교합니다 ★
+			// ID 비교 (CleanID로 안전하게 비교)
 			CString strMyClean = CleanID(m_strMyUID);
 			CString strParsedClean = CleanID(CStrA_to_CStr(strUid));
 
-			// (디버깅용: 만약 안되면 이 주석을 풀어서 팝업으로 확인해보세요)
-			// CString msg; msg.Format(L"내ID:[%s]\n방장ID:[%s]", strMyClean, strParsedClean); AfxMessageBox(msg);
-
 			if (strMyClean == strParsedClean)
 			{
-				GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE);
+				GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE); // 버튼 켜기
 			}
 		}
 		else
