@@ -310,7 +310,7 @@ void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 	else if (strJsonA.Find("\"op\": \"ROOM_STATE\"") != -1)
 	{
 		ParseRoomState(strJsonA);
-	}
+	}														
 	else if (strJsonA.Find("\"op\": \"ROLE\"") != -1)
 	{
 		ParseRole(strJsonA);
