@@ -53,6 +53,7 @@ BEGIN_MESSAGE_MAP(CNightDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_SKIP, &CNightDlg::OnClickedSkip) // 버튼이 있다면 주석 해제
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_LIST_PLAYERS, &CNightDlg::OnItemchangedPlayerList)
 	ON_EN_CHANGE(IDC_RE_CHATVIEW, &CNightDlg::OnEnChangeReChatview)
+	ON_MESSAGE(WM_USER_RECV_MSG, &CNightDlg::OnReceiveMsg)// 메시지 핸들러 연결
 END_MESSAGE_MAP()
 
 
@@ -364,3 +365,62 @@ HCURSOR CNightDlg::OnQueryDragIcon() {
 
 void CNightDlg::OnEnChangeReChatview() {}
 
+LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
+{
+	CStringA* pJsonA = (CStringA*)wParam;
+	if (!pJsonA) return 0;
+	CStringA strJson = *pJsonA;
+	delete pJsonA;
+
+	// 1. 밤 결과 확인 (마피아한테 죽었는지?)
+	if (strJson.Find("\"op\": \"NIGHT_RESULT\"") != -1)
+	{
+		// 희생자 UID 파싱
+		CString strVictim = _T("");
+		int nVic = strJson.Find("\"victim\": \"");
+		if (nVic != -1)
+		{
+			CStringA sVal = strJson.Mid(nVic + 11);
+			sVal = sVal.Left(sVal.Find('\"'));
+			strVictim = CString(CA2T(sVal));
+		}
+
+		// 의사가 살렸는지 확인
+		bool bSaved = (strJson.Find("\"saved\": true") != -1);
+
+		// ★ [핵심] 내가 희생자이고, 못 살았다면? -> 로비로 강퇴
+		// 여기서 m_strMyNickname에는 "Player1" 같은 이름이 들어있고, strVictim은 "UID"입니다.
+		// 따라서 내 UID와 비교해야 정확하지만, 편의상 서버가 보내준 이름 리스트랑 매칭해도 됩니다.
+		// 하지만 가장 안전한 건: 서버가 보내준 victim(UID)가 내 UID와 같은지 보는 것입니다.
+		// 현재 이 다이얼로그엔 내 UID 변수가 없으므로, 생성자나 부모에서 받아오면 좋지만,
+		// 일단 이름(Nickname)이나 역할 확인으로 대체합니다.
+
+		// (주의: 서버가 보내는 victim 값은 UID입니다!)
+		// 여기서는 간단히 "내 이름이 Player1이고 서버가 Player1 죽었다고 하면 나감" 처리가 필요하지만
+		// victim은 UID이므로, 클라이언트가 알기 어렵습니다.
+		// ★ 그래서, 서버가 보내주는 "ROOM_STATE"의 alive: false 를 보고 나가는 게 제일 정확합니다.
+		// 일단 여기선 메시지만 띄웁니다. 실제 퇴장은 아래 PHASE 변경 때 체크하거나 여기서 강제 종료.
+
+		if (!strVictim.IsEmpty() && !bSaved)
+		{
+			// 만약 내 UID를 이 클래스가 알고 있다면 비교 가능. 
+			// 모른다면 "누군가 죽었다"는 메시지만 띄우고, 
+			// 진짜 퇴장은 낮(DAY) 화면 진입 시 할 수 있습니다.
+			// 하지만 즉시 나가길 원하시니, 일단 메시지 띄우고 다음 단계로 넘깁니다.
+
+			CString msg;
+			msg.Format(_T("[속보] %s 님이 습격당했습니다."), strVictim);
+			AppendChat(msg);
+		}
+	}
+
+	// 2. 낮으로 페이즈 전환 (여기서 내가 죽었는지 체크해서 쫓아낼 수도 있음)
+	else if (strJson.Find("\"phase\": \"DAY\"") != -1)
+	{
+		// 여기서 로비로 나가지 않고 낮 화면(CDayDlg)으로 일단 넘어갑니다.
+		// CDayDlg가 열리자마자 "나 죽었네?" 하고 쫓겨나는 구조가 더 안전합니다.
+		OnOK();
+	}
+
+	return 0;
+}

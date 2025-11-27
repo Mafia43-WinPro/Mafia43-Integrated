@@ -230,36 +230,73 @@ afx_msg LRESULT CDayDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 
 void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 {
+	// 1. 채팅
 	if (strJsonA.Find("\"op\": \"CHAT\"") != -1)
 	{
 		ParseChat(strJsonA);
 	}
-	else if (strJsonA.Find("\"op\": \"VOTE_RESULT\"") != -1)
+	// 2. ★ 투표 결과 확인 (낮에 죽었을 때)
+	else if (strJsonA.Find("\"op\": \"DAY_RESULT\"") != -1)
 	{
-		ParseVoteResult(strJsonA);
+		CString strVictim = _T("");
+		int nVic = strJsonA.Find("\"victim\": \"");
+		if (nVic != -1) {
+			CStringA sVal = strJsonA.Mid(nVic + 11);
+			sVal = sVal.Left(sVal.Find('\"'));
+			strVictim = CString(CA2T(sVal));
+		}
+
+		if (!strVictim.IsEmpty())
+		{
+			// ★ 내 UID와 희생자 UID가 같으면 -> 로비로 강퇴
+			// (m_strMyUID 변수가 CDayDlg에는 있으므로 정확한 비교 가능!)
+
+			// CleanID 함수가 여기 없으니 단순 비교 (혹은 CString 변환 후 비교)
+			if (m_strMyUID.CompareNoCase(strVictim) == 0 || m_strMyUID.Find(strVictim) != -1)
+			{
+				KillTimer(1);
+				AfxMessageBox(_T("투표로 처형되었습니다. 로비로 이동합니다."));
+				EndDialog(IDCANCEL); // ★ 강제 퇴장
+				return;
+			}
+			else
+			{
+				CString msg;
+				msg.Format(_T("[속보] %s 님이 처형되었습니다.\r\n"), strVictim);
+				AppendTextToRichEdit(msg, RGB(255, 0, 0));
+			}
+		}
 	}
+	// 3. 룸 상태 업데이트 (여기서 내가 죽은 상태면 나갈 수도 있음)
 	else if (strJsonA.Find("\"op\": \"ROOM_STATE\"") != -1)
 	{
 		ParseRoomState(strJsonA);
-	}
-	else if (strJsonA.Find("\"op\": \"PHASE\"") != -1)
-	{
-		if (strJsonA.Find("\"phase\": \"NIGHT\"") != -1)
+
+		// 내 상태 확인: 죽어있다면 나가기
+		for (const auto& p : m_vecDayPlayers)
 		{
-			KillTimer(1); // [추가] 다이얼로그 닫기 전 타이머 중지
-			AppendTextToRichEdit(_T("[알림] 밤이 되었습니다.\r\n"), RGB(255, 0, 0));
-			OnOK();
+			if (p.strUID == m_strMyUID && !p.bIsAlive)
+			{
+				KillTimer(1);
+				AfxMessageBox(_T("당신은 사망한 상태입니다. 로비로 이동합니다."));
+				EndDialog(IDCANCEL); // ★ 강제 퇴장
+				return;
+			}
 		}
 	}
+	// 4. 밤으로 이동
+	else if (strJsonA.Find("\"phase\": \"NIGHT\"") != -1)
+	{
+		KillTimer(1);
+		AppendTextToRichEdit(_T("[알림] 밤이 되었습니다.\r\n"), RGB(255, 0, 0));
+		OnOK();
+	}
+	// 5. 게임 종료
 	else if (strJsonA.Find("\"op\": \"GAME_END\"") != -1)
 	{
-		KillTimer(1); // [추가] 다이얼로그 닫기 전 타이머 중지
+		KillTimer(1);
 		AfxMessageBox(_T("게임이 종료되었습니다!"));
 		OnCancel();
-	}
-	else if (strJsonA.Find("\"op\": \"ERROR\"") != -1)
-	{
-		AfxMessageBox(CStrA_to_CStr(strJsonA));
 	}
 }
 

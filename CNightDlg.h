@@ -48,6 +48,8 @@ protected:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnEnChangeReChatview();
 
+	afx_msg LRESULT OnReceiveMsg(WPARAM wParam, LPARAM lParam); //서버 메시지 수신 함수 선언
+
 	DECLARE_MESSAGE_MAP()
 
 public:
