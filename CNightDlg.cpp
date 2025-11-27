@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "Mafia43.h"       // 프로젝트 메인 헤더
 #include "CNightDlg.h"     // 밤 화면 헤더
 #include "afxdialogex.h"

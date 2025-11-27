@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "Mafia43.h"   // 메인 앱 헤더
 #include "CDayDlg.h"
 #include "resource.h"    // 리소스 헤더
@@ -364,3 +364,4 @@ CString CDayDlg::CStrA_to_CStr(const CStringA& strA)
 	CA2T utf8(strA, CP_UTF8);
 	return CString(utf8);
 }
+
