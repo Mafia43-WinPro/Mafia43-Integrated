@@ -410,87 +410,131 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 {
 	m_listPlayersInRoom.DeleteAllItems();
 
-	// 1. 방 ID 파싱 (Python 서버 기준: "room_id": " -> 12글자)
-	int nPos = strJsonA.Find("\"room_id\": \"");
+	// 1. 방 ID 파싱 (글자 수 대신 따옴표 위치로 찾기)
+	// "room_id" 키를 찾고, 그 뒤에 나오는 따옴표("") 사이의 값을 가져옴
+	int nPos = strJsonA.Find("\"room_id\"");
 	if (nPos != -1)
 	{
-		// [중요] 12글자 (따옴표, 콜론, 공백 포함)
-		CStringA strRid = strJsonA.Mid(nPos + 12);
-		strRid = strRid.Left(strRid.Find('\"'));
-		m_strRoomID = CStrA_to_CStr(strRid);
-		m_staticRoomInfo.SetWindowText(_T("방 입장 완료: ") + m_strRoomID);
+		int nColon = strJsonA.Find(':', nPos);
+		int nStart = strJsonA.Find('\"', nColon + 1); // 시작 따옴표
+		int nEnd = strJsonA.Find('\"', nStart + 1);   // 끝 따옴표
+
+		if (nStart != -1 && nEnd != -1)
+		{
+			CStringA strRid = strJsonA.Mid(nStart + 1, nEnd - nStart - 1);
+			m_strRoomID = CStrA_to_CStr(strRid);
+			m_staticRoomInfo.SetWindowText(_T("방 입장 완료: ") + m_strRoomID);
+		}
 	}
 
-	const char* pData = strJsonA.GetString();
-	const char* pPlayer = strstr(pData, "\"uid\": \""); // 첫 플레이어 찾기
+	// 2. 플레이어 리스트 파싱 (안전한 반복문)
+	CStringA strData = strJsonA;
+	int nSearchPos = strData.Find("\"players\":"); // players 배열 시작점 찾기
+	if (nSearchPos == -1) return;
+
 	int nItem = 0;
 
-	while (pPlayer)
+	// 반복해서 "uid"를 찾음
+	while (true)
 	{
-		// 2. UID 파싱 ("uid": " -> 8글자)
-		const char* pUidStart = pPlayer + 8;
-		const char* pUidEnd = strchr(pUidStart, '\"');
-		if (!pUidEnd) break;
+		// 1) UID 찾기
+		int nUidKey = strData.Find("\"uid\"", nSearchPos); // 현재 위치 이후에서 검색
+		if (nUidKey == -1) break; // 더 이상 없으면 종료
 
-		// 3. 닉네임 파싱 ("name": " -> 9글자)
-		// 파이썬은 name 키가 uid 뒤에 옴
-		const char* pNameKey = strstr(pUidEnd, "\"name\": \"");
-		if (!pNameKey) break;
-		const char* pNameStart = pNameKey + 9;
-		const char* pNameEnd = strchr(pNameStart, '\"');
-		if (!pNameEnd) break;
+		// 값 추출 (따옴표 사이)
+		int nColon = strData.Find(':', nUidKey);
+		int nValStart = strData.Find('\"', nColon + 1);
+		int nValEnd = strData.Find('\"', nValStart + 1);
+		if (nValStart == -1 || nValEnd == -1) break;
 
-		// 4. 생존 여부 ("alive":  -> 9글자, Boolean이라 따옴표 없음!)
-		const char* pAliveKey = strstr(pNameEnd, "\"alive\": ");
-		if (!pAliveKey) break;
-		const char* pAliveStart = pAliveKey + 9;
-		// true/false 뒤에 콤마(,)가 옴
-		const char* pAliveEnd = strchr(pAliveStart, ',');
-		if (!pAliveEnd) break;
+		CStringA strUid = strData.Mid(nValStart + 1, nValEnd - nValStart - 1);
 
-		// 5. 방장 여부 ("is_host":  -> 11글자, Boolean)
-		// [핵심] 파이썬 딕셔너리에서 is_host가 '마지막' 항목임.
-		// 그래서 뒤에 콤마(,)가 없고 중괄호(})가 옴.
-		const char* pHostKey = strstr(pAliveEnd, "\"is_host\": ");
-		if (!pHostKey) break;
+		// 검색 위치 업데이트 (현재 찾은 uid 뒤부터 다시 검색)
+		nSearchPos = nValEnd;
 
-		const char* pHostStart = pHostKey + 11; // "is_host":  (11글자)
-		const char* pHostEnd = strchr(pHostStart, '}'); // 닫는 중괄호 찾기
-		if (!pHostEnd) break;
+		// 2) 이름 찾기 (name)
+		CStringA strName = "";
+		int nNameKey = strData.Find("\"name\"", nSearchPos); // uid 뒤에서 검색
+		// (주의: 다음 사람의 uid보다 앞에 있어야 함)
+		int nNextUid = strData.Find("\"uid\"", nSearchPos);
 
-		// --- 문자열 추출 ---
-		CStringA strUid(pUidStart, (int)(pUidEnd - pUidStart));
-		CStringA strName(pNameStart, (int)(pNameEnd - pNameStart));
-		CStringA strAlive(pAliveStart, (int)(pAliveEnd - pAliveStart));
-		CStringA strHostVal(pHostStart, (int)(pHostEnd - pHostStart));
+		if (nNameKey != -1 && (nNextUid == -1 || nNameKey < nNextUid))
+		{
+			nColon = strData.Find(':', nNameKey);
+			nValStart = strData.Find('\"', nColon + 1);
+			nValEnd = strData.Find('\"', nValStart + 1);
+			if (nValStart != -1 && nValEnd != -1)
+			{
+				strName = strData.Mid(nValStart + 1, nValEnd - nValStart - 1);
+				nSearchPos = nValEnd;
+			}
+		}
 
-		// 값 정리 (공백 제거)
-		strHostVal.Trim();
+		// 3) 생존 여부 (alive - 따옴표 없는 boolean 값)
+		CStringA strAlive = "false";
+		int nAliveKey = strData.Find("\"alive\"", nSearchPos);
+		if (nAliveKey != -1)
+		{
+			nColon = strData.Find(':', nAliveKey);
+			// 값의 끝은 콤마(,) 혹은 중괄호(})
+			int nComma = strData.Find(',', nColon);
+			int nBrace = strData.Find('}', nColon);
 
-		// --- 리스트 추가 ---
-		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName));
-		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive.Find("true") != -1 ? _T("생존") : _T("사망")));
+			int nEnd = -1;
+			if (nComma != -1 && nBrace != -1) nEnd = min(nComma, nBrace);
+			else if (nComma != -1) nEnd = nComma;
+			else nEnd = nBrace;
 
-		// --- 방장 버튼 활성화 로직 ---
-		if (strHostVal.Find("true") != -1) // "true" 문자열이 포함되어 있으면 방장
+			if (nEnd != -1)
+			{
+				strAlive = strData.Mid(nColon + 1, nEnd - nColon - 1);
+				strAlive.Trim(); // 공백 제거
+				nSearchPos = nEnd;
+			}
+		}
+
+		// 4) 방장 여부 (is_host - 따옴표 없는 boolean 값)
+		CStringA strIsHost = "false";
+		int nHostKey = strData.Find("\"is_host\"", nSearchPos); // 공백 없이 키워드만 검색
+		if (nHostKey != -1)
+		{
+			nColon = strData.Find(':', nHostKey);
+			int nComma = strData.Find(',', nColon);
+			int nBrace = strData.Find('}', nColon);
+
+			int nEnd = -1;
+			if (nComma != -1 && nBrace != -1) nEnd = min(nComma, nBrace);
+			else if (nComma != -1) nEnd = nComma;
+			else nEnd = nBrace;
+
+			if (nEnd != -1)
+			{
+				strIsHost = strData.Mid(nColon + 1, nEnd - nColon - 1);
+				strIsHost.Trim();
+				nSearchPos = nEnd;
+			}
+		}
+
+		// --- 리스트 컨트롤에 추가 ---
+		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName)); // 이름
+		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive.Find("true") != -1 ? _T("생존") : _T("사망"))); // 상태
+
+		// ★ [핵심] 방장 버튼 활성화 로직
+		if (strIsHost.Find("true") != -1)
 		{
 			m_listPlayersInRoom.SetItemText(nItem, 2, _T("★"));
 
-			// 내 UID와 비교 (정확히 파싱됐으므로 이제 일치할 것임)
+			// 내 UID와 현재 파싱된 UID 비교
 			if (CStrA_to_CStr(strUid) == m_strMyUID)
 			{
-				GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE);
+				GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE); // 버튼 활성화!
 			}
 		}
 		else
 		{
 			m_listPlayersInRoom.SetItemText(nItem, 2, _T(""));
 		}
-
 		nItem++;
-
-		// 다음 플레이어 찾기 ("uid": " 검색)
-		pPlayer = strstr(pHostEnd, "\"uid\": \"");
 	}
 }
 
