@@ -328,7 +328,7 @@ void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 	else if (strJsonA.Find("\"op\": \"ROOM_STATE\"") != -1)
 	{
 		ParseRoomState(strJsonA);
-	}														
+	}
 	else if (strJsonA.Find("\"op\": \"ROLE\"") != -1)
 	{
 		ParseRole(strJsonA);
@@ -453,6 +453,21 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 		}
 	}
 
+	// ★★★ [추가] host 필드에서 방장 UID 추출
+	CStringA strHostUID = "";
+	int nHostPos = strJsonA.Find("\"host\"");
+	if (nHostPos != -1)
+	{
+		int nColon = strJsonA.Find(':', nHostPos);
+		int nStart = strJsonA.Find('\"', nColon + 1);
+		int nEnd = strJsonA.Find('\"', nStart + 1);
+		if (nStart != -1 && nEnd != -1)
+		{
+			strHostUID = strJsonA.Mid(nStart + 1, nEnd - nStart - 1);
+			strHostUID.Trim();
+		}
+	}
+
 	// 2. players 배열 찾기
 	int nListStart = strJsonA.Find("\"players\":");
 	if (nListStart == -1) return;
@@ -473,22 +488,24 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 		// 플레이어 한 명 데이터
 		CStringA strPlayerObj = strJsonA.Mid(nObjStart, nObjEnd - nObjStart + 1);
 
-		// ★ [핵심] 공백, 줄바꿈 싹 제거해서 깔끔하게 만듦 ★
-		// 예: "is_host" : true  ---> "is_host":true
+		// ★ 공백, 줄바꿈 제거
 		CStringA strCleanObj = strPlayerObj;
 		strCleanObj.Replace(" ", "");
 		strCleanObj.Replace("\t", "");
 		strCleanObj.Replace("\r", "");
 		strCleanObj.Replace("\n", "");
 
-		// 1) UID 추출 (공백 제거된 문자열에서 찾으면 따옴표 찾기가 애매하므로 원본 사용)
+		// 1) UID 추출
 		CStringA strUid = "";
 		int kUid = strPlayerObj.Find("\"uid\"");
 		if (kUid != -1) {
 			int c = strPlayerObj.Find(':', kUid);
 			int s = strPlayerObj.Find('\"', c + 1);
 			int e = strPlayerObj.Find('\"', s + 1);
-			if (s != -1 && e != -1) strUid = strPlayerObj.Mid(s + 1, e - s - 1);
+			if (s != -1 && e != -1) {
+				strUid = strPlayerObj.Mid(s + 1, e - s - 1);
+				strUid.Trim();
+			}
 		}
 
 		// 2) Name 추출
@@ -501,16 +518,16 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 			if (s != -1 && e != -1) strName = strPlayerObj.Mid(s + 1, e - s - 1);
 		}
 
-		// 3) Alive 추출 (공백 제거된 strCleanObj 사용)
+		// 3) Alive 추출
 		CStringA strAlive = "false";
-		// "alive":true 패턴이 있는지 확인
 		if (strCleanObj.Find("\"alive\":true") != -1) strAlive = "true";
 
-		// 4) Is_Host 추출 (공백 제거된 strCleanObj 사용)
+		// ★★★ 4) Is_Host 판별: host 필드의 UID와 현재 플레이어 UID 비교
 		CStringA strIsHost = "false";
-		// "is_host":true 패턴이 있는지 확인 (이제 띄어쓰기 걱정 없음)
-		if (strCleanObj.Find("\"is_host\":true") != -1) strIsHost = "true";
-
+		if (strUid == strHostUID)
+		{
+			strIsHost = "true";
+		}
 
 		// --- 리스트 추가 ---
 		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName));
