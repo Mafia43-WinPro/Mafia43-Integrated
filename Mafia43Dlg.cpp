@@ -463,7 +463,10 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 {
 	m_listPlayersInRoom.DeleteAllItems();
 
-	// 1. 방 ID 파싱
+	// [수정] 새 정보를 파싱하기 전에 기존 목록을 초기화합니다.
+	m_vecRoomPlayers.clear();
+
+	// 1. 방 ID 파싱 (기존 로직 유지)
 	int nPos = strJsonA.Find("\"room_id\"");
 	if (nPos != -1)
 	{
@@ -478,7 +481,7 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 		}
 	}
 
-	// ★★★ [추가] host 필드에서 방장 UID 추출
+	// ★★★ [추가] host 필드에서 방장 UID 추출 (기존 로직 유지)
 	CStringA strHostUID = "";
 	int nHostPos = strJsonA.Find("\"host\"");
 	if (nHostPos != -1)
@@ -493,7 +496,7 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 		}
 	}
 
-	// 2. players 배열 찾기
+	// 2. players 배열 찾기 (기존 로직 유지)
 	int nListStart = strJsonA.Find("\"players\":");
 	if (nListStart == -1) return;
 
@@ -513,14 +516,14 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 		// 플레이어 한 명 데이터
 		CStringA strPlayerObj = strJsonA.Mid(nObjStart, nObjEnd - nObjStart + 1);
 
-		// ★ 공백, 줄바꿈 제거
+		// ★ 공백, 줄바꿈 제거 (기존 로직 유지)
 		CStringA strCleanObj = strPlayerObj;
 		strCleanObj.Replace(" ", "");
 		strCleanObj.Replace("\t", "");
 		strCleanObj.Replace("\r", "");
 		strCleanObj.Replace("\n", "");
 
-		// 1) UID 추출
+		// 1) UID 추출 (기존 로직 유지)
 		CStringA strUid = "";
 		int kUid = strPlayerObj.Find("\"uid\"");
 		if (kUid != -1) {
@@ -533,7 +536,7 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 			}
 		}
 
-		// 2) Name 추출
+		// 2) Name 추출 (기존 로직 유지)
 		CStringA strName = "";
 		int kName = strPlayerObj.Find("\"name\"");
 		if (kName != -1) {
@@ -543,22 +546,31 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 			if (s != -1 && e != -1) strName = strPlayerObj.Mid(s + 1, e - s - 1);
 		}
 
-		// 3) Alive 추출
+		// 3) Alive 추출 (기존 로직 유지)
 		CStringA strAlive = "false";
 		if (strCleanObj.Find("\"alive\":true") != -1) strAlive = "true";
 
-		// ★★★ 4) Is_Host 판별: host 필드의 UID와 현재 플레이어 UID 비교
+		// ★★★ 4) Is_Host 판별 (기존 로직 유지)
 		CStringA strIsHost = "false";
 		if (strUid == strHostUID)
 		{
 			strIsHost = "true";
 		}
 
-		// --- 리스트 추가 ---
+		// --- [추가] 내부 목록(m_vecRoomPlayers)에 저장 ---
+		RoomPlayerInfo player;
+		player.strUID = CStrA_to_CStr(strUid);
+		player.strName = CStrA_to_CStr(strName);
+		player.bIsAlive = (strAlive == "true");
+		player.bIsHost = (strIsHost == "true");
+		m_vecRoomPlayers.push_back(player);
+
+
+		// --- 리스트 추가 --- (로비 화면 리스트 업데이트)
 		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName));
 		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive == "true" ? _T("생존") : _T("사망")));
 
-		// --- 방장 확인 및 버튼 활성화 ---
+		// --- 방장 확인 및 버튼 활성화 --- (기존 로직 유지)
 		if (strIsHost == "true")
 		{
 			m_listPlayersInRoom.SetItemText(nItem, 2, _T("★")); // 별표 찍기
@@ -618,22 +630,49 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 	while (bGameInProgress)
 	{
 		// --- 밤 페이즈 ---
-		CNightDlg dlgNight;
+
+		// [추가] CNightDlg에 전달할 플레이어 목록 (UID만 포함) 생성
+		std::vector<PlayerInfo> nightPlayers;
+		int tempIdCounter = 1;
+		for (const auto& roomPlayer : m_vecRoomPlayers)
+		{
+			// [핵심] 살아있는 플레이어만 목록에 포함
+			if (roomPlayer.bIsAlive)
+			{
+				PlayerInfo nightPlayer;
+				// CNightDlg의 PlayerInfo 구조체에 맞춰 데이터 변환
+				nightPlayer.id = tempIdCounter++;
+
+				// [핵심] CNightDlg의 name 필드에 UID 문자열을 저장하여 리스트에 표시되도록 합니다.
+				nightPlayer.name = roomPlayer.strUID;
+				nightPlayer.alive = roomPlayer.bIsAlive;
+				nightPlayers.push_back(nightPlayer);
+			}
+		}
+
+		// [수정] CNightDlg를 새로운 생성자(nightPlayers)로 인스턴스화
+		CNightDlg dlgNight(nightPlayers, this);
+
+		// [수정] 소켓 및 역할 설정 (기존 로직 유지)
 		dlgNight.m_strMyNickname = m_strNickname;
 		dlgNight.m_strMyRole = m_strMyRole;
 		dlgNight.m_pSocket = &m_Socket;
-		m_Socket.m_pDlg = &dlgNight; // 소켓 연결 대상 변경
+		m_Socket.m_pDlg = &dlgNight;
 
 		INT_PTR nResponse = dlgNight.DoModal();
 
 		if (nResponse != IDOK) { bGameInProgress = false; break; }
 
+		CDayDlg dlgDay(this, &m_Socket, m_strMyUID, m_strNickname, m_strMyRole, m_vecRoomPlayers);
+
+		/*
 		// --- 낮 페이즈 ---
 		CDayDlg dlgDay;
 		dlgDay.m_pSocket = &m_Socket;
 		dlgDay.m_strMyUID = m_strMyUID;
 		dlgDay.m_strMyNickname = m_strNickname;
 		dlgDay.m_strMyRole = m_strMyRole;
+		*/
 		m_Socket.m_pDlg = &dlgDay; // 소켓 연결 대상 변경
 
 		nResponse = dlgDay.DoModal();

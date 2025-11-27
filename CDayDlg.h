@@ -1,6 +1,10 @@
-﻿#pragma once
+#pragma once
 #include "afxdialogex.h"
 #include "CClientSocket.h" // 소켓 클래스 include
+#include <vector> // [추가] vector 사용
+#include "Mafia43Dlg.h"
+
+struct RoomPlayerInfo;
 
 // CDayDlg 대화 상자
 class CDayDlg : public CDialogEx
@@ -10,7 +14,9 @@ class CDayDlg : public CDialogEx
 public:
 	// 생성자
 	CDayDlg(CWnd* pParent = nullptr, CClientSocket* pSocket = nullptr,
-		CString strMyUID = _T(""), CString strMyNickname = _T(""), CString strMyRole = _T(""));
+		CString strMyUID = _T(""), CString strMyNickname = _T(""), CString strMyRole = _T(""),
+		const std::vector<RoomPlayerInfo>& players = std::vector<RoomPlayerInfo>()); // RoomPlayerInfo를 전달받음
+
 	virtual ~CDayDlg();
 
 	// 대화 상자 데이터입니다.
@@ -47,6 +53,10 @@ public:
 
 	// --- [추가] 타이머 멤버 변수 ---
 	int m_nDayTimeLimit; // 남은 시간 (초)
+
+	std::vector<RoomPlayerInfo> m_vecDayPlayers;
+
+	void PopulateVoteList();
 
 	// --- 컨트롤 변수 (수정됨) ---
 	CRichEditCtrl m_richChat;    // [수정] CListBox -> CRichEditCtrl (ID: IDC_RICH_CHAT)

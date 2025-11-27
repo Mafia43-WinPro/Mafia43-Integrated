@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "afxdialogex.h"
 #include "CClientSocket.h" // 서버 통신용 헤더
 #include <vector>
@@ -16,8 +16,11 @@ class CNightDlg : public CDialogEx
 	DECLARE_DYNAMIC(CNightDlg)
 
 public:
-	CNightDlg(CWnd* pParent = nullptr);   // 표준 생성자입니다.
+	//CNightDlg(CWnd* pParent = nullptr);   // 표준 생성자입니다.
+	CNightDlg(const std::vector<PlayerInfo>& players, CWnd* pParent = nullptr);   // 표준 생성자입니다.
 	virtual ~CNightDlg();
+	void SetSocket(CClientSocket* pSocket) { m_pSocket = pSocket; }
+	bool m_bActionSubmitted;
 
 	// 대화 상자 데이터입니다.
 #ifdef AFX_DESIGN_TIME
