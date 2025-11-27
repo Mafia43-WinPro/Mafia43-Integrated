@@ -143,7 +143,7 @@ BOOL CMafia43Dlg::OnInitDialog()
 	GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(FALSE);
 
 	m_staticRoomInfo.SetWindowText(_T("서버에 접속하세요."));
-
+	SetTimer(2U, 2000, NULL); // [추가] 2초마다 타이머 2번 실행
 	return TRUE;
 }
 
@@ -572,10 +572,22 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 
 void CMafia43Dlg::OnTimer(UINT_PTR nIDEvent)
 {
+	// 기존 게임 시작 타이머
 	if (nIDEvent == 1U)
 	{
 		OnGameStart(0, 0);
 	}
+
+	// [추가] 2번 타이머: 로비에 있을 때 방 목록 자동 갱신
+	if (nIDEvent == 2U)
+	{
+		// 방에 들어가 있지 않을 때만 요청 (방 안에서는 ROOM_STATE가 오니까 필요 없음)
+		if (m_strRoomID.IsEmpty())
+		{
+			m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
+		}
+	}
+
 	CDialogEx::OnTimer(nIDEvent);
 }
 
