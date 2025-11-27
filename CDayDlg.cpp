@@ -1,19 +1,22 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "Mafia43.h"   // 메인 앱 헤더
 #include "CDayDlg.h"
 #include "resource.h"    // 리소스 헤더
+#include "Mafia43Dlg.h"
 
 IMPLEMENT_DYNAMIC(CDayDlg, CDialogEx)
 
 CDayDlg::CDayDlg(CWnd* pParent /*=nullptr*/, CClientSocket* pSocket /*=nullptr*/,
-	CString strMyUID /*= _T("")*/, CString strMyNickname /*= _T("")*/, CString strMyRole /*= _T("")*/)
+	CString strMyUID /*= _T("")*/, CString strMyNickname /*= _T("")*/, CString strMyRole /*= _T("")*/,
+	const std::vector<RoomPlayerInfo>& players /*= std::vector<RoomPlayerInfo>()*/)
 	: CDialogEx(IDD_DAY, pParent)
 	, m_pSocket(pSocket)
 	, m_strMyUID(strMyUID)
 	, m_strMyNickname(strMyNickname)
 	, m_strMyRole(strMyRole)
 	, m_strChatMsg(_T(""))
-	, m_nDayTimeLimit(180) // [수정] 낮 토론 시간 180초 (3분)으로 초기화
+	, m_nDayTimeLimit(180)
+	, m_vecDayPlayers(players) // [핵심] 전달받은 플레이어 목록으로 초기화
 {
 }
 
@@ -58,8 +61,14 @@ BOOL CDayDlg::OnInitDialog()
 	m_listVote.InsertColumn(1, _T("닉네임"), LVCFMT_LEFT, 150);
 	m_listVote.InsertColumn(2, _T("상태"), LVCFMT_LEFT, 80);
 
+	CString strRoleDisplay;
+	strRoleDisplay.Format(_T("역할: %s"), m_strMyRole);
+	// [추가] 텍스트 ID (IDC_STATIC)를 사용하여 역할 표시
+	SetDlgItemText(IDC_STATIC, strRoleDisplay);
+
 	// 2. [유지] 서버에 생존자 목록 요청
-	m_pSocket->SendJson("{\"op\":\"ROOM_STATE\"}");
+	// m_pSocket->SendJson("{\"op\":\"ROOM_STATE\"}");
+	PopulateVoteList();
 
 	// 3. [수정] 채팅창에 알림 (Rich Edit 방식)
 	AppendTextToRichEdit(_T("[알림] 낮이 되었습니다. 토론을 시작하세요.\r\n"), RGB(0, 0, 255));
@@ -69,6 +78,25 @@ BOOL CDayDlg::OnInitDialog()
 	SetTimer(1, 1000, NULL); // 타이머 ID 1번, 1초(1000ms) 간격
 
 	return TRUE;
+}
+
+void CDayDlg::PopulateVoteList()
+{
+	m_listVote.DeleteAllItems();
+	int nItem = 0;
+	for (const auto& player : m_vecDayPlayers)
+	{
+		if (player.bIsAlive) // 생존자만 표시
+		{
+			// Column 0: UID (숨김)
+			m_listVote.InsertItem(nItem, player.strUID);
+			// Column 1: Nickname
+			m_listVote.SetItemText(nItem, 1, player.strName);
+			// Column 2: Status
+			m_listVote.SetItemText(nItem, 2, _T("생존"));
+			nItem++;
+		}
+	}
 }
 
 /**
@@ -266,14 +294,16 @@ void CDayDlg::ParseVoteResult(const CStringA& strJsonA)
 
 void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 {
-	m_listVote.DeleteAllItems();
+	// [수정] 서버에서 ROOM_STATE 메시지를 받으면 내부 목록을 갱신합니다.
+	m_vecDayPlayers.clear();
+
 	const char* pData = strJsonA.GetString();
 	const char* pPlayer = strstr(pData, "\"uid\": \"");
 	int nItem = 0;
 
 	while (pPlayer)
 	{
-		// ... (이하 ParseRoomState의 나머지 코드는 동일)
+		// ... (기존 파싱 로직: strUid, strName, strAlive 추출)
 		const char* pUidEnd = strstr(pPlayer + 9, "\"");
 		if (!pUidEnd) { pPlayer = nullptr; continue; }
 
@@ -289,26 +319,35 @@ void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 		const char* pAliveEnd = strstr(pAlive + 9, ",");
 		if (!pAliveEnd) { pPlayer = nullptr; continue; }
 
+		// [추가] is_host를 파싱하여 RoomPlayerInfo를 완성
 		const char* pHost = strstr(pAliveEnd, "\"is_host\": ");
 		if (!pHost) { pPlayer = nullptr; continue; }
 
 		const char* pHostEnd = strstr(pHost + 11, "}");
 		if (!pHostEnd) { pPlayer = nullptr; continue; }
 
+
 		CStringA strUid(pPlayer + 9, pUidEnd - (pPlayer + 9));
 		CStringA strName(pName + 10, pNameEnd - (pName + 10));
 		CStringA strAlive(pAlive + 9, pAliveEnd - (pAlive + 9));
 
-		if (strAlive == "true")
-		{
-			m_listVote.InsertItem(nItem, CStrA_to_CStr(strUid));
-			m_listVote.SetItemText(nItem, 1, CStrA_to_CStr(strName));
-			m_listVote.SetItemText(nItem, 2, _T("생존"));
-			nItem++;
-		}
+		// [수정] RoomPlayerInfo를 생성하여 m_vecDayPlayers에 추가
+		RoomPlayerInfo player;
+		player.strUID = CStrA_to_CStr(strUid);
+		player.strName = CStrA_to_CStr(strName);
+		player.bIsAlive = (strAlive == "true");
 
-		pPlayer = strstr(pHostEnd, "\"uid\": \"");
+		// 'is_host' 필드를 포함하는 정확한 JSON 파싱이 필요하지만,
+		// 현재 CDayDlg의 JSON 파싱은 이 부분을 생략하고 있으므로, 
+		// 간단히 false로 설정하고 다음 플레이어를 찾습니다.
+		player.bIsHost = false;
+		m_vecDayPlayers.push_back(player);
+
+		pPlayer = strstr(pHostEnd, "\"uid\": \""); // 다음 플레이어 검색
 	}
+
+	// [핵심] 내부 목록 갱신 후, 리스트 뷰 UI를 새로고침합니다.
+	PopulateVoteList();
 }
 
 
