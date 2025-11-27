@@ -269,7 +269,15 @@ void CMafia43Dlg::OnClickedButtonJoinRoom()
 
 void CMafia43Dlg::OnClickedButtonStartGame()
 {
-	m_Socket.SendJson("{\"op\":\"START\"}");
+	// [최종 수정] 공백이나 특수문자 없이 깔끔하게 포맷팅
+	CStringA strOp = "START";
+	CStringA strPacket;
+	strPacket.Format("{\"op\":\"%s\"}", strOp);
+
+	// 이 시점에서 strPacket은 {"op":"START"} 딱 이것만 들어감
+	m_Socket.SendJson(strPacket);
+
+	// 버튼 비활성화
 	GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(FALSE);
 }
 
