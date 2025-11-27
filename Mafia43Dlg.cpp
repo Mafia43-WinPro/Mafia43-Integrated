@@ -1,4 +1,4 @@
-// Mafia43Dlg.cpp: 구현 파일
+﻿// Mafia43Dlg.cpp: 구현 파일
 
 #include "pch.h"
 #include "framework.h"
@@ -224,7 +224,7 @@ void CMafia43Dlg::OnClickedButtonConnect()
 
 	// [주의] 서버 컴퓨터의 IP 주소를 입력해야 합니다. (로컬 테스트 시 127.0.0.1)
 	// 기존에 입력하신 IP: 10.21.32.245
-	if (!m_Socket.Connect(_T("10.21.32.245"), 5566))
+	if (!m_Socket.Connect(_T("10.21.32.1"), 5566))
 	{
 		if (GetLastError() != WSAEWOULDBLOCK)
 		{
@@ -393,13 +393,23 @@ void CMafia43Dlg::ParseHello(const CStringA& strJsonA)
 			m_strMyUID = CStrA_to_CStr(strUid);
 			m_strMyUID.Trim(); // 혹시 모를 공백 제거
 
-			m_strNickname = m_strMyUID;
+			//m_strNickname = m_strMyUID;
 			UpdateData(FALSE);
+
 
 			m_staticRoomInfo.SetWindowText(_T("서버 접속 완료. 방을 선택하세요."));
 
 			GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
 			GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);
+
+			UpdateData(TRUE); // 에디트 컨트롤의 값을 변수(m_strNickname)로 가져옴
+			if (!m_strNickname.IsEmpty())
+			{
+				CStringA strPacket;
+				// JSON 포맷: {"op": "LOGIN", "name": "사용자입력닉네임"}
+				strPacket.Format("{\"op\":\"LOGIN\", \"name\":\"%s\"}", (LPCSTR)CStr_to_CStrA(m_strNickname));
+				m_Socket.SendJson(strPacket);
+			}
 		}
 	}
 }
