@@ -16,7 +16,7 @@ IMPLEMENT_DYNAMIC(CNightDlg, CDialogEx)
 CNightDlg::CNightDlg(const std::vector<PlayerInfo>& players, CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_NIGHT_DIALOG, pParent)
 	, m_pSocket(nullptr)
-	, m_timeLeftSec(30) // 기본 30초
+	, m_timeLeftSec(200) // 기본 30초
 	, m_players(players) // 전달받은 플레이어 목록으로 초기화
 	, m_bActionSubmitted(false)
 {
@@ -131,7 +131,7 @@ BOOL CNightDlg::OnInitDialog()
 	InitPlayerList();
 
 	// 5. 타이머 시작
-	m_timeLeftSec = 30;
+	m_timeLeftSec = 200;
 	SetTimer(1, 1000, nullptr);
 
 	return TRUE;
