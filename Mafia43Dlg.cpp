@@ -93,6 +93,24 @@ BEGIN_MESSAGE_MAP(CMafia43Dlg, CDialogEx)
 	ON_MESSAGE(WM_USER_GAME_START, &CMafia43Dlg::OnGameStart)
 END_MESSAGE_MAP()
 
+// [추가] 문자열 청소 함수 (공백, 따옴표, 줄바꿈 모두 제거)
+CString CleanID(CString strInput)
+{
+	CString strResult = _T("");
+	for (int i = 0; i < strInput.GetLength(); i++)
+	{
+		TCHAR ch = strInput.GetAt(i);
+		// 숫자(0-9)거나 알파벳(A-Z, a-z)인 경우만 남김
+		if ((ch >= '0' && ch <= '9') ||
+			(ch >= 'A' && ch <= 'Z') ||
+			(ch >= 'a' && ch <= 'z'))
+		{
+			strResult += ch;
+		}
+	}
+	return strResult;
+}
+
 
 // CMafia43Dlg 메시지 처리기
 
@@ -440,7 +458,7 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 	int nListStart = strJsonA.Find("\"players\":");
 	if (nListStart == -1) return;
 
-	// 대괄호 [ 다음부터 검색 시작
+	// 대괄호 [ 다음부터 검색
 	int nSearchPos = strJsonA.Find('[', nListStart);
 	if (nSearchPos == -1) return;
 
@@ -449,19 +467,16 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 	// 루프: 플레이어 객체 { ... } 하나씩 찾아서 파싱
 	while (true)
 	{
-		// 객체 시작 '{' 과 끝 '}' 찾기
 		int nObjStart = strJsonA.Find('{', nSearchPos);
-		if (nObjStart == -1) break; // 더 이상 플레이어 없음
+		if (nObjStart == -1) break;
 
 		int nObjEnd = strJsonA.Find('}', nObjStart);
-		if (nObjEnd == -1) break; // JSON 형식이 이상함
+		if (nObjEnd == -1) break;
 
-		// ★ 중요: 플레이어 한 명분의 데이터만 잘라냄
+		// 플레이어 한 명 데이터
 		CStringA strPlayerObj = strJsonA.Mid(nObjStart, nObjEnd - nObjStart + 1);
 
-		// --- 잘라낸 데이터 안에서 정보 추출 ---
-
-		// 1) UID
+		// 1) UID 추출
 		CStringA strUid = "";
 		int kUid = strPlayerObj.Find("\"uid\"");
 		if (kUid != -1) {
@@ -471,7 +486,7 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 			if (s != -1 && e != -1) strUid = strPlayerObj.Mid(s + 1, e - s - 1);
 		}
 
-		// 2) Name
+		// 2) Name 추출
 		CStringA strName = "";
 		int kName = strPlayerObj.Find("\"name\"");
 		if (kName != -1) {
@@ -481,38 +496,31 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 			if (s != -1 && e != -1) strName = strPlayerObj.Mid(s + 1, e - s - 1);
 		}
 
-		// 3) Alive (Boolean)
+		// 3) Alive 추출
 		CStringA strAlive = "false";
-		int kAlive = strPlayerObj.Find("\"alive\"");
-		if (kAlive != -1) {
-			int c = strPlayerObj.Find(':', kAlive);
-			// 값 추출 (콤마나 } 전까지)
-			CStringA val = strPlayerObj.Mid(c + 1);
-			val.TrimLeft(); // 앞 공백 제거
-			if (val.Left(4) == "true") strAlive = "true";
-		}
+		if (strPlayerObj.Find("\"alive\": true") != -1) strAlive = "true"; // 간단 검사
 
-		// 4) Is_Host (Boolean)
+		// 4) Is_Host 추출
 		CStringA strIsHost = "false";
-		int kHost = strPlayerObj.Find("\"is_host\"");
-		if (kHost != -1) {
-			int c = strPlayerObj.Find(':', kHost);
-			CStringA val = strPlayerObj.Mid(c + 1);
-			val.TrimLeft();
-			if (val.Left(4) == "true") strIsHost = "true";
-		}
+		if (strPlayerObj.Find("\"is_host\": true") != -1) strIsHost = "true"; // 간단 검사
 
 		// --- 리스트 추가 ---
 		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName));
 		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive == "true" ? _T("생존") : _T("사망")));
 
-		// --- 방장 확인 ---
+		// --- [핵심] 방장 확인 (CleanID 사용) ---
 		if (strIsHost == "true")
 		{
 			m_listPlayersInRoom.SetItemText(nItem, 2, _T("★"));
 
-			// [핵심] 이제 m_strMyUID도 Trim() 되었고, strUid도 정확히 파싱되었으므로 일치함
-			if (CStrA_to_CStr(strUid) == m_strMyUID)
+			// ★ 여기서 CleanID를 써서 껍데기를 다 벗기고 알맹이만 비교합니다 ★
+			CString strMyClean = CleanID(m_strMyUID);
+			CString strParsedClean = CleanID(CStrA_to_CStr(strUid));
+
+			// (디버깅용: 만약 안되면 이 주석을 풀어서 팝업으로 확인해보세요)
+			// CString msg; msg.Format(L"내ID:[%s]\n방장ID:[%s]", strMyClean, strParsedClean); AfxMessageBox(msg);
+
+			if (strMyClean == strParsedClean)
 			{
 				GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE);
 			}
@@ -523,7 +531,7 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 		}
 
 		nItem++;
-		nSearchPos = nObjEnd + 1; // 다음 객체 검색을 위해 위치 이동
+		nSearchPos = nObjEnd + 1;
 	}
 }
 
