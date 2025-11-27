@@ -332,22 +332,32 @@ void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 
 void CMafia43Dlg::ParseHello(const CStringA& strJsonA)
 {
-	// "uid": "C2C8AB" 
-	int nPos = strJsonA.Find("\"uid\": \"");
+	// "uid" 키워드 찾기
+	int nPos = strJsonA.Find("\"uid\"");
 	if (nPos != -1)
 	{
-		// [수정] 9 -> 8 (정확한 길이로 수정)
-		CStringA strUid = strJsonA.Mid(nPos + 8);
-		strUid = strUid.Left(strUid.Find('\"'));
-		m_strMyUID = CStrA_to_CStr(strUid);
+		// 콜론(:) 찾기
+		int nColon = strJsonA.Find(':', nPos);
 
-		m_strNickname = m_strMyUID;
-		UpdateData(FALSE);
+		// 값의 시작 따옴표(")와 끝 따옴표(") 찾기
+		int nStart = strJsonA.Find('\"', nColon + 1);
+		int nEnd = strJsonA.Find('\"', nStart + 1);
 
-		m_staticRoomInfo.SetWindowText(_T("서버 접속 완료. 방을 선택하세요."));
+		if (nStart != -1 && nEnd != -1)
+		{
+			// 정확한 ID 추출
+			CStringA strUid = strJsonA.Mid(nStart + 1, nEnd - nStart - 1);
+			m_strMyUID = CStrA_to_CStr(strUid);
+			m_strMyUID.Trim(); // 혹시 모를 공백 제거
 
-		GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
-		GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);
+			m_strNickname = m_strMyUID;
+			UpdateData(FALSE);
+
+			m_staticRoomInfo.SetWindowText(_T("서버 접속 완료. 방을 선택하세요."));
+
+			GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
+			GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);
+		}
 	}
 }
 
@@ -410,14 +420,13 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 {
 	m_listPlayersInRoom.DeleteAllItems();
 
-	// 1. 방 ID 파싱 (글자 수 대신 따옴표 위치로 찾기)
-	// "room_id" 키를 찾고, 그 뒤에 나오는 따옴표("") 사이의 값을 가져옴
+	// 1. 방 ID 파싱
 	int nPos = strJsonA.Find("\"room_id\"");
 	if (nPos != -1)
 	{
 		int nColon = strJsonA.Find(':', nPos);
-		int nStart = strJsonA.Find('\"', nColon + 1); // 시작 따옴표
-		int nEnd = strJsonA.Find('\"', nStart + 1);   // 끝 따옴표
+		int nStart = strJsonA.Find('\"', nColon + 1);
+		int nEnd = strJsonA.Find('\"', nStart + 1);
 
 		if (nStart != -1 && nEnd != -1)
 		{
@@ -427,114 +436,94 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 		}
 	}
 
-	// 2. 플레이어 리스트 파싱 (안전한 반복문)
-	CStringA strData = strJsonA;
-	int nSearchPos = strData.Find("\"players\":"); // players 배열 시작점 찾기
+	// 2. players 배열 찾기
+	int nListStart = strJsonA.Find("\"players\":");
+	if (nListStart == -1) return;
+
+	// 대괄호 [ 다음부터 검색 시작
+	int nSearchPos = strJsonA.Find('[', nListStart);
 	if (nSearchPos == -1) return;
 
 	int nItem = 0;
 
-	// 반복해서 "uid"를 찾음
+	// 루프: 플레이어 객체 { ... } 하나씩 찾아서 파싱
 	while (true)
 	{
-		// 1) UID 찾기
-		int nUidKey = strData.Find("\"uid\"", nSearchPos); // 현재 위치 이후에서 검색
-		if (nUidKey == -1) break; // 더 이상 없으면 종료
+		// 객체 시작 '{' 과 끝 '}' 찾기
+		int nObjStart = strJsonA.Find('{', nSearchPos);
+		if (nObjStart == -1) break; // 더 이상 플레이어 없음
 
-		// 값 추출 (따옴표 사이)
-		int nColon = strData.Find(':', nUidKey);
-		int nValStart = strData.Find('\"', nColon + 1);
-		int nValEnd = strData.Find('\"', nValStart + 1);
-		if (nValStart == -1 || nValEnd == -1) break;
+		int nObjEnd = strJsonA.Find('}', nObjStart);
+		if (nObjEnd == -1) break; // JSON 형식이 이상함
 
-		CStringA strUid = strData.Mid(nValStart + 1, nValEnd - nValStart - 1);
+		// ★ 중요: 플레이어 한 명분의 데이터만 잘라냄
+		CStringA strPlayerObj = strJsonA.Mid(nObjStart, nObjEnd - nObjStart + 1);
 
-		// 검색 위치 업데이트 (현재 찾은 uid 뒤부터 다시 검색)
-		nSearchPos = nValEnd;
+		// --- 잘라낸 데이터 안에서 정보 추출 ---
 
-		// 2) 이름 찾기 (name)
+		// 1) UID
+		CStringA strUid = "";
+		int kUid = strPlayerObj.Find("\"uid\"");
+		if (kUid != -1) {
+			int c = strPlayerObj.Find(':', kUid);
+			int s = strPlayerObj.Find('\"', c + 1);
+			int e = strPlayerObj.Find('\"', s + 1);
+			if (s != -1 && e != -1) strUid = strPlayerObj.Mid(s + 1, e - s - 1);
+		}
+
+		// 2) Name
 		CStringA strName = "";
-		int nNameKey = strData.Find("\"name\"", nSearchPos); // uid 뒤에서 검색
-		// (주의: 다음 사람의 uid보다 앞에 있어야 함)
-		int nNextUid = strData.Find("\"uid\"", nSearchPos);
-
-		if (nNameKey != -1 && (nNextUid == -1 || nNameKey < nNextUid))
-		{
-			nColon = strData.Find(':', nNameKey);
-			nValStart = strData.Find('\"', nColon + 1);
-			nValEnd = strData.Find('\"', nValStart + 1);
-			if (nValStart != -1 && nValEnd != -1)
-			{
-				strName = strData.Mid(nValStart + 1, nValEnd - nValStart - 1);
-				nSearchPos = nValEnd;
-			}
+		int kName = strPlayerObj.Find("\"name\"");
+		if (kName != -1) {
+			int c = strPlayerObj.Find(':', kName);
+			int s = strPlayerObj.Find('\"', c + 1);
+			int e = strPlayerObj.Find('\"', s + 1);
+			if (s != -1 && e != -1) strName = strPlayerObj.Mid(s + 1, e - s - 1);
 		}
 
-		// 3) 생존 여부 (alive - 따옴표 없는 boolean 값)
+		// 3) Alive (Boolean)
 		CStringA strAlive = "false";
-		int nAliveKey = strData.Find("\"alive\"", nSearchPos);
-		if (nAliveKey != -1)
-		{
-			nColon = strData.Find(':', nAliveKey);
-			// 값의 끝은 콤마(,) 혹은 중괄호(})
-			int nComma = strData.Find(',', nColon);
-			int nBrace = strData.Find('}', nColon);
-
-			int nEnd = -1;
-			if (nComma != -1 && nBrace != -1) nEnd = min(nComma, nBrace);
-			else if (nComma != -1) nEnd = nComma;
-			else nEnd = nBrace;
-
-			if (nEnd != -1)
-			{
-				strAlive = strData.Mid(nColon + 1, nEnd - nColon - 1);
-				strAlive.Trim(); // 공백 제거
-				nSearchPos = nEnd;
-			}
+		int kAlive = strPlayerObj.Find("\"alive\"");
+		if (kAlive != -1) {
+			int c = strPlayerObj.Find(':', kAlive);
+			// 값 추출 (콤마나 } 전까지)
+			CStringA val = strPlayerObj.Mid(c + 1);
+			val.TrimLeft(); // 앞 공백 제거
+			if (val.Left(4) == "true") strAlive = "true";
 		}
 
-		// 4) 방장 여부 (is_host - 따옴표 없는 boolean 값)
+		// 4) Is_Host (Boolean)
 		CStringA strIsHost = "false";
-		int nHostKey = strData.Find("\"is_host\"", nSearchPos); // 공백 없이 키워드만 검색
-		if (nHostKey != -1)
-		{
-			nColon = strData.Find(':', nHostKey);
-			int nComma = strData.Find(',', nColon);
-			int nBrace = strData.Find('}', nColon);
-
-			int nEnd = -1;
-			if (nComma != -1 && nBrace != -1) nEnd = min(nComma, nBrace);
-			else if (nComma != -1) nEnd = nComma;
-			else nEnd = nBrace;
-
-			if (nEnd != -1)
-			{
-				strIsHost = strData.Mid(nColon + 1, nEnd - nColon - 1);
-				strIsHost.Trim();
-				nSearchPos = nEnd;
-			}
+		int kHost = strPlayerObj.Find("\"is_host\"");
+		if (kHost != -1) {
+			int c = strPlayerObj.Find(':', kHost);
+			CStringA val = strPlayerObj.Mid(c + 1);
+			val.TrimLeft();
+			if (val.Left(4) == "true") strIsHost = "true";
 		}
 
-		// --- 리스트 컨트롤에 추가 ---
-		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName)); // 이름
-		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive.Find("true") != -1 ? _T("생존") : _T("사망"))); // 상태
+		// --- 리스트 추가 ---
+		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName));
+		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive == "true" ? _T("생존") : _T("사망")));
 
-		// ★ [핵심] 방장 버튼 활성화 로직
-		if (strIsHost.Find("true") != -1)
+		// --- 방장 확인 ---
+		if (strIsHost == "true")
 		{
 			m_listPlayersInRoom.SetItemText(nItem, 2, _T("★"));
 
-			// 내 UID와 현재 파싱된 UID 비교
+			// [핵심] 이제 m_strMyUID도 Trim() 되었고, strUid도 정확히 파싱되었으므로 일치함
 			if (CStrA_to_CStr(strUid) == m_strMyUID)
 			{
-				GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE); // 버튼 활성화!
+				GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE);
 			}
 		}
 		else
 		{
 			m_listPlayersInRoom.SetItemText(nItem, 2, _T(""));
 		}
+
 		nItem++;
+		nSearchPos = nObjEnd + 1; // 다음 객체 검색을 위해 위치 이동
 	}
 }
 
