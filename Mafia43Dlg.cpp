@@ -1,5 +1,4 @@
 ﻿// Mafia43Dlg.cpp: 구현 파일
-// (모든 공백(space) 문제 수정 완료)
 
 #include "pch.h"
 #include "framework.h"
@@ -66,21 +65,10 @@ void CMafia43Dlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 
 	// --- UI 컨트롤과 변수 연결 ---
-	// (UI 편집기에서 설정한 ID와 일치해야 함)
-
-	// '방 목록' (IDC_LIST_PLAYERS)
 	DDX_Control(pDX, IDC_LIST_PLAYERS, m_listRooms);
-
-	// '방 정보' (IDC_STATIC_ROOMCODE)
 	DDX_Control(pDX, IDC_STATIC_ROOMCODE, m_staticRoomInfo);
-
-	// '닉네임' (IDC_EDIT_NICKNAME)
 	DDX_Text(pDX, IDC_EDIT_NICKNAME, m_strNickname);
-
-	// '방 안의 플레이어 목록' (IDC_LIST_PLAYERS_IN_ROOM)
 	DDX_Control(pDX, IDC_LIST_PLAYERS_IN_ROOM, m_listPlayersInRoom);
-
-	// '방 제목' (IDC_EDIT_ROOM_TITLE)
 	DDX_Text(pDX, IDC_EDIT_ROOM_TITLE, m_strRoomTitle);
 }
 
@@ -176,7 +164,7 @@ void CMafia43Dlg::OnPaint()
 {
 	if (IsIconic())
 	{
-		CPaintDC dc(this); // 그리기를 위한 디바이스 컨텍스트입니다.
+		CPaintDC dc(this);
 		SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
 		int cxIcon = GetSystemMetrics(SM_CXICON);
 		int cyIcon = GetSystemMetrics(SM_CYICON);
@@ -215,6 +203,9 @@ void CMafia43Dlg::OnClickedButtonConnect()
 			return;
 		}
 	}
+
+	// [주의] 서버 컴퓨터의 IP 주소를 입력해야 합니다. (로컬 테스트 시 127.0.0.1)
+	// 기존에 입력하신 IP: 10.21.32.245
 	if (!m_Socket.Connect(_T("10.21.32.245"), 5566))
 	{
 		if (GetLastError() != WSAEWOULDBLOCK)
@@ -299,19 +290,15 @@ LRESULT CMafia43Dlg::OnRecvMsg(WPARAM wParam, LPARAM lParam)
 	CStringA* pJsonA = (CStringA*)wParam;
 	CStringA strJsonA = *pJsonA;
 
-	// --- [수정] 디버깅용 팝업 코드는 이제 삭제합니다 ---
-	// AfxMessageBox(CStrA_to_CStr(strJsonA)); 
-
 	delete pJsonA;
 	ProcessServerMessage(strJsonA);
 	return 0;
 }
 
-// --- [수정] JSON 파싱 로직 (공백 대응) ---
+// --- JSON 파싱 로직 (수정됨) ---
 
 void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 {
-	// "op": "HELLO" (공백 포함)
 	if (strJsonA.Find("\"op\": \"HELLO\"") != -1)
 	{
 		ParseHello(strJsonA);
@@ -345,11 +332,11 @@ void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 
 void CMafia43Dlg::ParseHello(const CStringA& strJsonA)
 {
-	// "uid": "C2C8AB"
+	// "uid": "C2C8AB" 
 	int nPos = strJsonA.Find("\"uid\": \"");
 	if (nPos != -1)
 	{
-		// [수정] 9 -> 8 (정확한 길이)
+		// [수정] 9 -> 8 (정확한 길이로 수정)
 		CStringA strUid = strJsonA.Mid(nPos + 8);
 		strUid = strUid.Left(strUid.Find('\"'));
 		m_strMyUID = CStrA_to_CStr(strUid);
@@ -374,34 +361,32 @@ void CMafia43Dlg::ParseRoomList(const CStringA& strJsonA)
 
 	while (pRoom)
 	{
-		// [수정] 8 -> 7 ("id": ")
+		// [수정] 8 -> 7
 		const char* pIdEnd = strstr(pRoom + 7, "\"");
 		if (!pIdEnd) { pRoom = nullptr; continue; }
 
-		// [수정] title 부분 오프셋 조정
 		const char* pTitle = strstr(pIdEnd, "\"title\": \"");
 		if (!pTitle) { pRoom = nullptr; continue; }
-		// [수정] 11 -> 10 ("title": ")
+		// [수정] 11 -> 10
 		const char* pTitleEnd = strstr(pTitle + 10, "\"");
 		if (!pTitleEnd) { pRoom = nullptr; continue; }
 
 		const char* pCur = strstr(pTitleEnd, "\"cur\": ");
 		if (!pCur) { pRoom = nullptr; continue; }
-		const char* pCurEnd = strstr(pCur + 7, ","); // 7 맞음
+		const char* pCurEnd = strstr(pCur + 7, ",");
 		if (!pCurEnd) { pRoom = nullptr; continue; }
 
 		const char* pMax = strstr(pCurEnd, "\"max\": ");
 		if (!pMax) { pRoom = nullptr; continue; }
-		const char* pMaxEnd = strstr(pMax + 7, ","); // 7 맞음
+		const char* pMaxEnd = strstr(pMax + 7, ",");
 		if (!pMaxEnd) { pRoom = nullptr; continue; }
 
 		const char* pState = strstr(pMaxEnd, "\"state\": \"");
 		if (!pState) { pRoom = nullptr; continue; }
-		// [수정] 11 -> 10 ("state": ")
+		// [수정] 11 -> 10
 		const char* pStateEnd = strstr(pState + 10, "\"");
 		if (!pStateEnd) { pRoom = nullptr; continue; }
 
-		// [수정] 추출 길이도 숫자에 맞춰 변경
 		CStringA strId(pRoom + 7, pIdEnd - (pRoom + 7));
 		CStringA strTitle(pTitle + 10, pTitleEnd - (pTitle + 10));
 		CStringA strCur(pCur + 7, pCurEnd - (pCur + 7));
@@ -425,70 +410,97 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 {
 	m_listPlayersInRoom.DeleteAllItems();
 
+	// 1. 방 ID 파싱 (Python 서버 기준: "room_id": " -> 12글자)
 	int nPos = strJsonA.Find("\"room_id\": \"");
 	if (nPos != -1)
 	{
-		// [수정] 13 -> 11 ("room_id": ") 
-		// (참고: room_id는 1+7+1+1+1 = 11글자입니다)
-		CStringA strRid = strJsonA.Mid(nPos + 11);
+		// [중요] 12글자 (따옴표, 콜론, 공백 포함)
+		CStringA strRid = strJsonA.Mid(nPos + 12);
 		strRid = strRid.Left(strRid.Find('\"'));
 		m_strRoomID = CStrA_to_CStr(strRid);
 		m_staticRoomInfo.SetWindowText(_T("방 입장 완료: ") + m_strRoomID);
 	}
 
 	const char* pData = strJsonA.GetString();
-	const char* pPlayer = strstr(pData, "\"uid\": \"");
+	const char* pPlayer = strstr(pData, "\"uid\": \""); // 첫 플레이어 찾기
 	int nItem = 0;
 
 	while (pPlayer)
 	{
-		// [수정] 9 -> 8 ("uid": ")
-		const char* pUidEnd = strstr(pPlayer + 8, "\"");
-		if (!pUidEnd) { pPlayer = nullptr; continue; }
+		// 2. UID 파싱 ("uid": " -> 8글자)
+		const char* pUidStart = pPlayer + 8;
+		const char* pUidEnd = strchr(pUidStart, '\"');
+		if (!pUidEnd) break;
 
-		const char* pName = strstr(pUidEnd, "\"name\": \"");
-		if (!pName) { pPlayer = nullptr; continue; }
-		// [수정] 10 -> 9 ("name": ") - ★ 여기가 'uest' 원인 해결!
-		const char* pNameEnd = strstr(pName + 9, "\"");
-		if (!pNameEnd) { pPlayer = nullptr; continue; }
+		// 3. 닉네임 파싱 ("name": " -> 9글자)
+		// 파이썬은 name 키가 uid 뒤에 옴
+		const char* pNameKey = strstr(pUidEnd, "\"name\": \"");
+		if (!pNameKey) break;
+		const char* pNameStart = pNameKey + 9;
+		const char* pNameEnd = strchr(pNameStart, '\"');
+		if (!pNameEnd) break;
 
-		const char* pAlive = strstr(pNameEnd, "\"alive\": ");
-		if (!pAlive) { pPlayer = nullptr; continue; }
-		const char* pAliveEnd = strstr(pAlive + 9, ","); // 9 맞음
-		if (!pAliveEnd) { pPlayer = nullptr; continue; }
+		// 4. 생존 여부 ("alive":  -> 9글자, Boolean이라 따옴표 없음!)
+		const char* pAliveKey = strstr(pNameEnd, "\"alive\": ");
+		if (!pAliveKey) break;
+		const char* pAliveStart = pAliveKey + 9;
+		// true/false 뒤에 콤마(,)가 옴
+		const char* pAliveEnd = strchr(pAliveStart, ',');
+		if (!pAliveEnd) break;
 
-		const char* pHost = strstr(pAliveEnd, "\"is_host\": ");
-		if (!pHost) { pPlayer = nullptr; continue; }
-		const char* pHostEnd = strstr(pHost + 11, "}"); // 11 맞음
-		if (!pHostEnd) { pPlayer = nullptr; continue; }
+		// 5. 방장 여부 ("is_host":  -> 11글자, Boolean)
+		// [핵심] 파이썬 딕셔너리에서 is_host가 '마지막' 항목임.
+		// 그래서 뒤에 콤마(,)가 없고 중괄호(})가 옴.
+		const char* pHostKey = strstr(pAliveEnd, "\"is_host\": ");
+		if (!pHostKey) break;
 
-		// [수정] 추출 길이 변경
-		CStringA strUid(pPlayer + 8, pUidEnd - (pPlayer + 8));
-		CStringA strName(pName + 9, pNameEnd - (pName + 9));
-		CStringA strAlive(pAlive + 9, pAliveEnd - (pAlive + 9));
-		CStringA strHost(pHost + 11, pHostEnd - (pHost + 11));
+		const char* pHostStart = pHostKey + 11; // "is_host":  (11글자)
+		const char* pHostEnd = strchr(pHostStart, '}'); // 닫는 중괄호 찾기
+		if (!pHostEnd) break;
 
+		// --- 문자열 추출 ---
+		CStringA strUid(pUidStart, (int)(pUidEnd - pUidStart));
+		CStringA strName(pNameStart, (int)(pNameEnd - pNameStart));
+		CStringA strAlive(pAliveStart, (int)(pAliveEnd - pAliveStart));
+		CStringA strHostVal(pHostStart, (int)(pHostEnd - pHostStart));
+
+		// 값 정리 (공백 제거)
+		strHostVal.Trim();
+
+		// --- 리스트 추가 ---
 		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName));
-		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive == "true" ? _T("생존") : _T("사망")));
-		m_listPlayersInRoom.SetItemText(nItem, 2, (strHost == "true" ? _T("★") : _T("")));
+		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive.Find("true") != -1 ? _T("생존") : _T("사망")));
 
-		if (CStrA_to_CStr(strUid) == m_strMyUID && strHost == "true")
+		// --- 방장 버튼 활성화 로직 ---
+		if (strHostVal.Find("true") != -1) // "true" 문자열이 포함되어 있으면 방장
 		{
-			GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE);
+			m_listPlayersInRoom.SetItemText(nItem, 2, _T("★"));
+
+			// 내 UID와 비교 (정확히 파싱됐으므로 이제 일치할 것임)
+			if (CStrA_to_CStr(strUid) == m_strMyUID)
+			{
+				GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE);
+			}
+		}
+		else
+		{
+			m_listPlayersInRoom.SetItemText(nItem, 2, _T(""));
 		}
 
 		nItem++;
+
+		// 다음 플레이어 찾기 ("uid": " 검색)
 		pPlayer = strstr(pHostEnd, "\"uid\": \"");
 	}
 }
 
 void CMafia43Dlg::ParseRole(const CStringA& strJsonA)
 {
-	// "role": "COP" (공백 포함)
-	int nPos = strJsonA.Find("\"role\": \""); // (공백 추가)
+	int nPos = strJsonA.Find("\"role\": \"");
 	if (nPos != -1)
 	{
-		CStringA strRole = strJsonA.Mid(nPos + 9); // (8 -> 10->9)
+		// [수정] 10 -> 9
+		CStringA strRole = strJsonA.Mid(nPos + 9);
 		strRole = strRole.Left(strRole.Find('\"'));
 
 		if (strRole == "MAFIA") m_strMyRole = _T("마피아");
@@ -499,12 +511,8 @@ void CMafia43Dlg::ParseRole(const CStringA& strJsonA)
 }
 
 
-/**
- * @brief [수정] 게임 시작 및 밤/낮 순환(Game Loop) 처리
- */
 LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 {
-	// 1. 역할 정보가 올 때까지 0.1초 대기 (기존 로직)
 	if (m_strMyRole.IsEmpty())
 	{
 		SetTimer(1U, 100, NULL);
@@ -512,74 +520,51 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 	}
 	KillTimer(1U);
 
-	// 2. 역할 배정 팝업
 	CRoleAssignDlg dlgRole;
 	dlgRole.m_strRoleToShow = m_strMyRole;
 	dlgRole.DoModal();
 
-	// 3. 메인 로비 숨김
 	ShowWindow(SW_HIDE);
 
-	// 4. [신규] 게임 순환(Loop) 시작
 	bool bGameInProgress = true;
 	while (bGameInProgress)
 	{
-		// --- 4-1. 밤(NIGHT) 페이즈 ---
+		// --- 밤 페이즈 ---
 		CNightDlg dlgNight;
 		dlgNight.m_strMyNickname = m_strNickname;
 		dlgNight.m_strMyRole = m_strMyRole;
 		dlgNight.m_pSocket = &m_Socket;
-
-		// [중요] 소켓이 메시지를 보낼 대상을 '밤 다이얼로그'로 설정
-		m_Socket.m_pDlg = &dlgNight;
+		m_Socket.m_pDlg = &dlgNight; // 소켓 연결 대상 변경
 
 		INT_PTR nResponse = dlgNight.DoModal();
 
-		// OnCancel() (게임 종료 메시지 수신 등)로 닫히면 루프 종료
-		if (nResponse != IDOK)
-		{
-			bGameInProgress = false;
-			break;
-		}
+		if (nResponse != IDOK) { bGameInProgress = false; break; }
 
-		// --- 4-2. 낮(DAY) 페이즈 ---
+		// --- 낮 페이즈 ---
 		CDayDlg dlgDay;
 		dlgDay.m_pSocket = &m_Socket;
-		dlgDay.m_strMyUID = m_strMyUID; // UID 전달
+		dlgDay.m_strMyUID = m_strMyUID;
 		dlgDay.m_strMyNickname = m_strNickname;
 		dlgDay.m_strMyRole = m_strMyRole;
-
-		// [중요] 소켓이 메시지를 보낼 대상을 '낮 다이얼로그'로 설정
-		m_Socket.m_pDlg = &dlgDay;
+		m_Socket.m_pDlg = &dlgDay; // 소켓 연결 대상 변경
 
 		nResponse = dlgDay.DoModal();
 
-		// OnCancel() (게임 종료 메시지 수신 등)로 닫히면 루프 종료
-		if (nResponse != IDOK)
-		{
-			bGameInProgress = false;
-			break;
-		}
-	} // end of while(bGameInProgress)
+		if (nResponse != IDOK) { bGameInProgress = false; break; }
+	}
 
-	// 5. 게임 종료 후 뒷정리
-
-	// [중요] 소켓이 메시지를 보낼 대상을 다시 '메인 로비'로 복구
+	// 게임 종료 후 복구
 	m_Socket.m_pDlg = this;
+	ShowWindow(SW_SHOW);
 
-	ShowWindow(SW_SHOW); // 메인 로비 다시 표시
-
-	// 변수 초기화
 	m_strMyRole = _T("");
 	m_strRoomID = _T("");
 	m_staticRoomInfo.SetWindowText(_T("게임 종료. 방을 선택하세요."));
 
-	// 버튼 활성화
 	GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
 	GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);
 	GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(FALSE);
 
-	// 방 목록 갱신
 	m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
 
 	return 0;
