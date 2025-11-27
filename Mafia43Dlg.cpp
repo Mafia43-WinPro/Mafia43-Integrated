@@ -248,6 +248,7 @@ void CMafia43Dlg::OnClickedButtonCreateRoom()
 	m_Socket.SendJson(strMsg);
 	GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(FALSE);
 	GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(FALSE);
+	SetTimer(3U, 1000, NULL);
 }
 
 void CMafia43Dlg::OnClickedButtonJoinRoom()
@@ -320,6 +321,7 @@ void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 	if (strJsonA.Find("\"op\": \"HELLO\"") != -1)
 	{
 		ParseHello(strJsonA);
+		m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
 	}
 	else if (strJsonA.Find("\"op\": \"ROOM_LIST\"") != -1)
 	{
@@ -328,6 +330,10 @@ void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 	else if (strJsonA.Find("\"op\": \"ROOM_STATE\"") != -1)
 	{
 		ParseRoomState(strJsonA);
+		if (m_strRoomID.IsEmpty())
+		{
+			m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
+		}
 	}
 	else if (strJsonA.Find("\"op\": \"ROLE\"") != -1)
 	{
@@ -345,6 +351,7 @@ void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 		GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
 		GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);
 		AfxMessageBox(CStrA_to_CStr(strJsonA));
+		m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
 	}
 }
 
@@ -649,6 +656,12 @@ void CMafia43Dlg::OnTimer(UINT_PTR nIDEvent)
 		{
 			m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
 		}
+	}
+
+	if (nIDEvent == 3U)
+	{
+		KillTimer(3U);
+		m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
 	}
 
 	CDialogEx::OnTimer(nIDEvent);
