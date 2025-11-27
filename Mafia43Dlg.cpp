@@ -215,7 +215,7 @@ void CMafia43Dlg::OnClickedButtonConnect()
 			return;
 		}
 	}
-	if (!m_Socket.Connect(_T("127.0.0.1"), 5566))
+	if (!m_Socket.Connect(_T("10.21.32.245"), 5566))
 	{
 		if (GetLastError() != WSAEWOULDBLOCK)
 		{
@@ -345,16 +345,17 @@ void CMafia43Dlg::ProcessServerMessage(CStringA strJsonA)
 
 void CMafia43Dlg::ParseHello(const CStringA& strJsonA)
 {
-	// "uid": "C2C8AB" (공백 포함)
+	// "uid": "C2C8AB"
 	int nPos = strJsonA.Find("\"uid\": \"");
 	if (nPos != -1)
 	{
-		CStringA strUid = strJsonA.Mid(nPos + 9); // (7 -> 9 수정)
+		// [수정] 9 -> 8 (정확한 길이)
+		CStringA strUid = strJsonA.Mid(nPos + 8);
 		strUid = strUid.Left(strUid.Find('\"'));
 		m_strMyUID = CStrA_to_CStr(strUid);
 
 		m_strNickname = m_strMyUID;
-		UpdateData(FALSE); // 컨트롤에 닉네임 표시
+		UpdateData(FALSE);
 
 		m_staticRoomInfo.SetWindowText(_T("서버 접속 완료. 방을 선택하세요."));
 
@@ -368,45 +369,44 @@ void CMafia43Dlg::ParseRoomList(const CStringA& strJsonA)
 	m_listRooms.DeleteAllItems();
 	const char* pData = strJsonA.GetString();
 
-	// "id": "R123" (공백 포함)
-	const char* pRoom = strstr(pData, "\"id\": \""); // (공백 추가)
+	const char* pRoom = strstr(pData, "\"id\": \"");
 	int nItem = 0;
 
 	while (pRoom)
 	{
-		// (모든 strstr 오프셋과 길이에 공백 1~2칸 추가)
-		const char* pIdEnd = strstr(pRoom + 8, "\""); // (6 -> 8)
+		// [수정] 8 -> 7 ("id": ")
+		const char* pIdEnd = strstr(pRoom + 7, "\"");
 		if (!pIdEnd) { pRoom = nullptr; continue; }
 
-		const char* pTitle = strstr(pIdEnd, "\"title\": \""); // (공백 추가)
+		// [수정] title 부분 오프셋 조정
+		const char* pTitle = strstr(pIdEnd, "\"title\": \"");
 		if (!pTitle) { pRoom = nullptr; continue; }
-
-		const char* pTitleEnd = strstr(pTitle + 11, "\""); // (9 -> 11)
+		// [수정] 11 -> 10 ("title": ")
+		const char* pTitleEnd = strstr(pTitle + 10, "\"");
 		if (!pTitleEnd) { pRoom = nullptr; continue; }
 
-		const char* pCur = strstr(pTitleEnd, "\"cur\": "); // (공백 추가)
+		const char* pCur = strstr(pTitleEnd, "\"cur\": ");
 		if (!pCur) { pRoom = nullptr; continue; }
-
-		const char* pCurEnd = strstr(pCur + 7, ","); // (6 -> 7)
+		const char* pCurEnd = strstr(pCur + 7, ","); // 7 맞음
 		if (!pCurEnd) { pRoom = nullptr; continue; }
 
-		const char* pMax = strstr(pCurEnd, "\"max\": "); // (공백 추가)
+		const char* pMax = strstr(pCurEnd, "\"max\": ");
 		if (!pMax) { pRoom = nullptr; continue; }
-
-		const char* pMaxEnd = strstr(pMax + 7, ","); // (6 -> 7)
+		const char* pMaxEnd = strstr(pMax + 7, ","); // 7 맞음
 		if (!pMaxEnd) { pRoom = nullptr; continue; }
 
-		const char* pState = strstr(pMaxEnd, "\"state\": \""); // (공백 추가)
+		const char* pState = strstr(pMaxEnd, "\"state\": \"");
 		if (!pState) { pRoom = nullptr; continue; }
-
-		const char* pStateEnd = strstr(pState + 11, "\""); // (9 -> 11)
+		// [수정] 11 -> 10 ("state": ")
+		const char* pStateEnd = strstr(pState + 10, "\"");
 		if (!pStateEnd) { pRoom = nullptr; continue; }
 
-		CStringA strId(pRoom + 8, pIdEnd - (pRoom + 8)); // (6 -> 8)
-		CStringA strTitle(pTitle + 11, pTitleEnd - (pTitle + 11)); // (9 -> 11)
-		CStringA strCur(pCur + 7, pCurEnd - (pCur + 7)); // (6 -> 7)
-		CStringA strMax(pMax + 7, pMaxEnd - (pMax + 7)); // (6 -> 7)
-		CStringA strState(pState + 11, pStateEnd - (pState + 11)); // (9 -> 11)
+		// [수정] 추출 길이도 숫자에 맞춰 변경
+		CStringA strId(pRoom + 7, pIdEnd - (pRoom + 7));
+		CStringA strTitle(pTitle + 10, pTitleEnd - (pTitle + 10));
+		CStringA strCur(pCur + 7, pCurEnd - (pCur + 7));
+		CStringA strMax(pMax + 7, pMaxEnd - (pMax + 7));
+		CStringA strState(pState + 10, pStateEnd - (pState + 10));
 
 		CString strCurMax;
 		strCurMax.Format(_T("%s/%s"), (LPCTSTR)CStrA_to_CStr(strCur), (LPCTSTR)CStrA_to_CStr(strMax));
@@ -417,7 +417,7 @@ void CMafia43Dlg::ParseRoomList(const CStringA& strJsonA)
 		m_listRooms.SetItemText(nItem, 3, CStrA_to_CStr(strState));
 		nItem++;
 
-		pRoom = strstr(pStateEnd, "\"id\": \""); // (공백 추가)
+		pRoom = strstr(pStateEnd, "\"id\": \"");
 	}
 }
 
@@ -425,49 +425,48 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 {
 	m_listPlayersInRoom.DeleteAllItems();
 
-	// "room_id": "R123" (공백 포함)
-	int nPos = strJsonA.Find("\"room_id\": \""); // (공백 추가)
+	int nPos = strJsonA.Find("\"room_id\": \"");
 	if (nPos != -1)
 	{
-		CStringA strRid = strJsonA.Mid(nPos + 13); // (11 -> 13)
+		// [수정] 13 -> 11 ("room_id": ") 
+		// (참고: room_id는 1+7+1+1+1 = 11글자입니다)
+		CStringA strRid = strJsonA.Mid(nPos + 11);
 		strRid = strRid.Left(strRid.Find('\"'));
 		m_strRoomID = CStrA_to_CStr(strRid);
 		m_staticRoomInfo.SetWindowText(_T("방 입장 완료: ") + m_strRoomID);
 	}
 
 	const char* pData = strJsonA.GetString();
-	// "uid": "C2C8AB" (공백 포함)
-	const char* pPlayer = strstr(pData, "\"uid\": \""); // (공백 추가)
+	const char* pPlayer = strstr(pData, "\"uid\": \"");
 	int nItem = 0;
 
 	while (pPlayer)
 	{
-		// (모든 strstr 오프셋과 길이에 공백 1~2칸 추가)
-		const char* pUidEnd = strstr(pPlayer + 9, "\""); // (7 -> 9)
+		// [수정] 9 -> 8 ("uid": ")
+		const char* pUidEnd = strstr(pPlayer + 8, "\"");
 		if (!pUidEnd) { pPlayer = nullptr; continue; }
 
-		const char* pName = strstr(pUidEnd, "\"name\": \""); // (공백 추가)
+		const char* pName = strstr(pUidEnd, "\"name\": \"");
 		if (!pName) { pPlayer = nullptr; continue; }
-
-		const char* pNameEnd = strstr(pName + 10, "\""); // (8 -> 10)
+		// [수정] 10 -> 9 ("name": ") - ★ 여기가 'uest' 원인 해결!
+		const char* pNameEnd = strstr(pName + 9, "\"");
 		if (!pNameEnd) { pPlayer = nullptr; continue; }
 
-		const char* pAlive = strstr(pNameEnd, "\"alive\": "); // (공백 추가)
+		const char* pAlive = strstr(pNameEnd, "\"alive\": ");
 		if (!pAlive) { pPlayer = nullptr; continue; }
-
-		const char* pAliveEnd = strstr(pAlive + 9, ","); // (8 -> 9)
+		const char* pAliveEnd = strstr(pAlive + 9, ","); // 9 맞음
 		if (!pAliveEnd) { pPlayer = nullptr; continue; }
 
-		const char* pHost = strstr(pAliveEnd, "\"is_host\": "); // (공백 추가)
+		const char* pHost = strstr(pAliveEnd, "\"is_host\": ");
 		if (!pHost) { pPlayer = nullptr; continue; }
-
-		const char* pHostEnd = strstr(pHost + 11, "}"); // (10 -> 11)
+		const char* pHostEnd = strstr(pHost + 11, "}"); // 11 맞음
 		if (!pHostEnd) { pPlayer = nullptr; continue; }
 
-		CStringA strUid(pPlayer + 9, pUidEnd - (pPlayer + 9)); // (7 -> 9)
-		CStringA strName(pName + 10, pNameEnd - (pName + 10)); // (8 -> 10)
-		CStringA strAlive(pAlive + 9, pAliveEnd - (pAlive + 9)); // (8 -> 9)
-		CStringA strHost(pHost + 11, pHostEnd - (pHost + 11)); // (10 -> 11)
+		// [수정] 추출 길이 변경
+		CStringA strUid(pPlayer + 8, pUidEnd - (pPlayer + 8));
+		CStringA strName(pName + 9, pNameEnd - (pName + 9));
+		CStringA strAlive(pAlive + 9, pAliveEnd - (pAlive + 9));
+		CStringA strHost(pHost + 11, pHostEnd - (pHost + 11));
 
 		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName));
 		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive == "true" ? _T("생존") : _T("사망")));
@@ -475,11 +474,11 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 
 		if (CStrA_to_CStr(strUid) == m_strMyUID && strHost == "true")
 		{
-			GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE); // 내가 방장!
+			GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(TRUE);
 		}
 
 		nItem++;
-		pPlayer = strstr(pHostEnd, "\"uid\": \""); // (공백 추가)
+		pPlayer = strstr(pHostEnd, "\"uid\": \"");
 	}
 }
 
