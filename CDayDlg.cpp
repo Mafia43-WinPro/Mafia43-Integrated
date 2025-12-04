@@ -20,7 +20,7 @@ CDayDlg::CDayDlg(CWnd* pParent, CClientSocket* pSocket,
 	, m_strMyNickname(strMyNickname)
 	, m_strMyRole(strMyRole)
 	, m_vecDayPlayers(players)
-	, m_nDayTimeLimit(120) // 낮 120초
+	, m_nDayTimeLimit(120) // 낮 시간 120초
 {
 }
 
@@ -57,11 +57,10 @@ BOOL CDayDlg::OnInitDialog()
 	m_listVote.InsertColumn(2, _T("상태"), LVCFMT_LEFT, 80);
 
 	CString strRoleDisplay;
-	// [수정] (LPCTSTR) 캐스팅 추가
 	strRoleDisplay.Format(_T("역할: %s"), (LPCTSTR)m_strMyRole);
 	SetDlgItemText(IDC_STATIC, strRoleDisplay);
 
-	// 죽었는지 확인
+	// 1. 방금 밤에 죽었는지 확인 (입장 컷)
 	for (const auto& p : m_vecDayPlayers) {
 		if (p.strUID == m_strMyUID && !p.bIsAlive) {
 			AfxMessageBox(_T("마피아에게 습격당해 사망했습니다... 로비로 이동합니다."));
@@ -70,9 +69,15 @@ BOOL CDayDlg::OnInitDialog()
 		}
 	}
 
+	// 2. 초기 리스트 그리기
 	PopulateVoteList();
 	AppendTextToRichEdit(_T("[알림] 낮이 되었습니다. 토론을 시작하세요.\r\n"), RGB(0, 0, 255));
 
+	// ★★★ [핵심] 서버에게 "최신 명단 줘!" 라고 요청 ★★★
+	// 이걸 해야 밤 사이에 죽은 사람이 반영된 리스트를 다시 받습니다.
+	m_pSocket->SendJson("{\"op\":\"ROOM_STATE\"}");
+
+	// 3. 타이머 시작
 	UpdateTimerDisplay();
 	SetTimer(1, 1000, NULL);
 
@@ -108,8 +113,21 @@ void CDayDlg::OnTimer(UINT_PTR nIDEvent)
 		}
 		else {
 			KillTimer(1);
-			AppendTextToRichEdit(_T("[알림] 토론 시간이 종료되었습니다.\r\n"), RGB(255, 0, 0));
+			AppendTextToRichEdit(_T("[알림] 토론 시간이 종료되었습니다. 투표 집계 중...\r\n"), RGB(255, 0, 0));
 			GetDlgItem(IDC_BUTTON_VOTE)->EnableWindow(FALSE);
+
+			// 시간이 끝나면 방장이 서버에 신호를 보냄
+			bool bAmIHost = false;
+			for (const auto& p : m_vecDayPlayers) {
+				if (p.strUID == m_strMyUID && p.bIsHost) {
+					bAmIHost = true;
+					break;
+				}
+			}
+
+			if (bAmIHost && m_pSocket) {
+				m_pSocket->SendJson("{\"op\": \"NEXT_PHASE\"}");
+			}
 		}
 	}
 	CDialogEx::OnTimer(nIDEvent);
@@ -119,8 +137,6 @@ void CDayDlg::UpdateTimerDisplay()
 {
 	CString strTime;
 	strTime.Format(_T("남은 시간: %02d:%02d"), m_nDayTimeLimit / 60, m_nDayTimeLimit % 60);
-
-	// [수정] 리소스 뷰에 있는 ID인 IDC_STATIC_TIME 사용
 	SetDlgItemText(IDC_STATIC_TIME, strTime);
 }
 
@@ -140,7 +156,6 @@ void CDayDlg::OnBnClickedButtonSendChat()
 	if (m_strChatMsg.IsEmpty() || !m_pSocket) return;
 
 	CStringA strJson;
-	// [수정] (LPCSTR) 캐스팅 확인
 	strJson.Format("{\"op\":\"DAY_CHAT\", \"text\":\"%s\"}", (LPCSTR)CStr_to_CStrA(m_strChatMsg));
 	m_pSocket->SendJson(strJson);
 
@@ -165,7 +180,6 @@ void CDayDlg::OnBnClickedButtonVote()
 
 	if (m_pSocket) {
 		CStringA strJson;
-		// [수정] (LPCSTR) 캐스팅 확인
 		strJson.Format("{\"op\":\"DAY_VOTE\", \"target\":\"%s\"}", (LPCSTR)CStr_to_CStrA(strTargetUID));
 		m_pSocket->SendJson(strJson);
 		GetDlgItem(IDC_BUTTON_VOTE)->EnableWindow(FALSE);
@@ -229,8 +243,12 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 			AppendTextToRichEdit(_T("[알림] 아무도 처형되지 않았습니다.\r\n"), RGB(0, 100, 0));
 		}
 	}
+	// ★ [핵심] 서버가 보내준 최신 명단(ROOM_STATE) 처리
 	else if (strJsonA.Find("\"op\": \"ROOM_STATE\"") != -1) {
 		ParseRoomState(strJsonA);
+		// (여기서 리스트가 갱신되어 죽은 사람은 화면에서 사라짐)
+
+		// 혹시 내가 죽은 걸로 바뀌었는지 한 번 더 확인
 		for (const auto& p : m_vecDayPlayers) {
 			if (p.strUID == m_strMyUID && !p.bIsAlive) {
 				KillTimer(1);
@@ -284,8 +302,70 @@ void CDayDlg::ParseChat(const CStringA& strJsonA)
 	}
 }
 
-void CDayDlg::ParseRoomState(const CStringA& strJsonA) {
+// ★ [수정] 최신 정보를 받아 리스트를 갱신하는 함수
+void CDayDlg::ParseRoomState(const CStringA& strJsonA)
+{
 	m_vecDayPlayers.clear();
+
+	const char* pData = strJsonA.GetString();
+	const char* pPlayer = strstr(pData, "\"uid\": \"");
+
+	while (pPlayer)
+	{
+		const char* pObjEnd = strchr(pPlayer, '}');
+		if (!pObjEnd) break;
+
+		CStringA strPlayerObj(pPlayer, pObjEnd - pPlayer + 1);
+
+		// 공백 제거 (파싱 안전장치)
+		CStringA strCleanObj = strPlayerObj;
+		strCleanObj.Replace(" ", "");
+		strCleanObj.Replace("\t", "");
+		strCleanObj.Replace("\r", "");
+		strCleanObj.Replace("\n", "");
+
+		// 데이터 추출
+		CStringA strUid = "";
+		int kUid = strPlayerObj.Find("\"uid\"");
+		if (kUid != -1) {
+			int c = strPlayerObj.Find(':', kUid);
+			int s = strPlayerObj.Find('\"', c + 1);
+			int e = strPlayerObj.Find('\"', s + 1);
+			if (s != -1 && e != -1) strUid = strPlayerObj.Mid(s + 1, e - s - 1);
+		}
+
+		CStringA strName = "";
+		int kName = strPlayerObj.Find("\"name\"");
+		if (kName != -1) {
+			int c = strPlayerObj.Find(':', kName);
+			int s = strPlayerObj.Find('\"', c + 1);
+			int e = strPlayerObj.Find('\"', s + 1);
+			if (s != -1 && e != -1) strName = strPlayerObj.Mid(s + 1, e - s - 1);
+		}
+
+		bool bAlive = (strCleanObj.Find("\"alive\":true") != -1);
+		bool bIsHost = (strCleanObj.Find("\"is_host\":true") != -1);
+
+		RoomPlayerInfo player;
+		player.strUID = CStrA_to_CStr(strUid);
+		player.strName = CStrA_to_CStr(strName);
+		player.bIsAlive = bAlive;
+		player.bIsHost = bIsHost;
+
+		m_vecDayPlayers.push_back(player);
+
+		pPlayer = strstr(pObjEnd, "\"uid\": \"");
+	}
+
+	// [중요] 메인 화면에도 업데이트 (다음 밤을 위해)
+	CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
+	if (pMain)
+	{
+		pMain->m_vecRoomPlayers = m_vecDayPlayers;
+	}
+
+	// ★ [중요] 화면 새로고침
+	PopulateVoteList();
 }
 
 void CDayDlg::ParseVoteResult(const CStringA& strJsonA) {}
