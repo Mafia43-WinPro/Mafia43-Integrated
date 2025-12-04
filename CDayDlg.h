@@ -35,6 +35,10 @@ protected:
 	// --- [수정] 헬퍼 함수 선언 ---
 	void AppendTextToRichEdit(CString strText, COLORREF color = RGB(0, 0, 0)); // 채팅창에 텍스트 추가
 	void UpdateTimerDisplay(); // 타이머 UI 갱신
+	CStringA ExtractJsonStringField(const CStringA& json, const CStringA& fieldName);
+	const RoomPlayerInfo* FindPlayerByUID(const CString& uid) const;
+	const RoomPlayerInfo* FindPlayerByNumber(int number) const;
+	const RoomPlayerInfo* FindPlayerByName(const CString& name) const;
 
 	// --- [유지] CMafia43Dlg와 동일한 파싱/헬퍼 함수 ---
 	void ProcessServerMessage(CStringA strJsonA);
@@ -54,6 +58,7 @@ public:
 
 	// --- [추가] 타이머 멤버 변수 ---
 	int m_nDayTimeLimit; // 남은 시간 (초)
+	bool m_bNextPhaseRequested = false;
 
 	std::vector<RoomPlayerInfo> m_vecDayPlayers;
 
@@ -70,4 +75,6 @@ public:
 	afx_msg void OnBnClickedButtonVote();     // (ID: IDC_BUTTON_VOTE)
 	afx_msg LRESULT OnReceiveMsg(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);  // [추가] 타이머 핸들러
+	virtual void OnOK();
+	void RequestPhaseChange(bool bNotifyServer);
 };
