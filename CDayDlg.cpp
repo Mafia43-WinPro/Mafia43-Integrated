@@ -85,17 +85,17 @@ void CDayDlg::PopulateVoteList()
 	int nItem = 0;
 	for (const auto& player : m_vecDayPlayers)
 	{
-		if (player.bIsAlive)
-		{
-			// Player{number} 형식으로 표시
-			CString strDisplayName;
-			strDisplayName.Format(_T("Player%d"), player.nPlayerNumber);
+		// 모든 플레이어 표시 (죽은 플레이어도 포함)
+		CString strDisplayName;
+		strDisplayName.Format(_T("Player%d"), player.nPlayerNumber);
 
-			m_listVote.InsertItem(nItem, player.strUID);
-			m_listVote.SetItemText(nItem, 1, strDisplayName);
-			m_listVote.SetItemText(nItem, 2, _T("생존"));
-			nItem++;
-		}
+		m_listVote.InsertItem(nItem, player.strUID);
+		m_listVote.SetItemText(nItem, 1, strDisplayName);
+
+		// 상태를 올바르게 표시
+		m_listVote.SetItemText(nItem, 2, player.bIsAlive ? _T("생존") : _T("사망"));
+
+		nItem++;
 	}
 }
 
@@ -153,7 +153,15 @@ void CDayDlg::OnBnClickedButtonVote()
 	if (nItem == -1) { AfxMessageBox(_T("투표할 대상을 선택하세요.")); return; }
 
 	CString strTargetUID = m_listVote.GetItemText(nItem, 0);
+	CString strTargetStatus = m_listVote.GetItemText(nItem, 2);
+
 	if (strTargetUID == m_strMyUID) { AfxMessageBox(_T("자신에게 투표할 수 없습니다.")); return; }
+
+	// 죽은 플레이어에게 투표 방지
+	if (strTargetStatus == _T("사망")) {
+		AfxMessageBox(_T("사망한 플레이어에게 투표할 수 없습니다."));
+		return;
+	}
 
 	if (m_pSocket) {
 		CStringA strJson;
