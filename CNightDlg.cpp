@@ -357,11 +357,13 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 		}
 		*/
 
-		// 메시지 표시
-		CString msg;
-		msg.Format(_T("%s: %s\r\n"), (LPCTSTR)sender, (LPCTSTR)text);
-		AppendChat(msg);
-	}
+			// 내가 보낸 메시지가 다시 돌아온 경우(서버 정책에 따라 다름) 중복 표시 방지 로직을 넣을 수도 있으나,
+			// 일단 다 표시하는 것이 안전함.
+			CString msg;
+			msg.Format(_T("%s: %s\r\n"), (LPCTSTR)sender, (LPCTSTR)CString(CA2T(sText, CP_UTF8)));
+			AppendChat(msg);
+		}
+	}ㅇㅇ
 	// 4. 게임 종료
 	else if (strJson.Find("\"op\": \"GAME_END\"") != -1)
 	{
