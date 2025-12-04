@@ -1,4 +1,4 @@
-﻿// CNightDlg.cpp : 구현 파일
+// CNightDlg.cpp : 구현 파일
 
 #include "pch.h"
 #include "Mafia43.h"       // 프로젝트 메인 헤더
@@ -20,6 +20,7 @@ CNightDlg::CNightDlg(const std::vector<PlayerInfo>& players, CWnd* pParent /*=nu
 	, m_timeLeftSec(60) // ★ [수정] 밤 시간 60초로 설정
 	, m_players(players)
 	, m_bActionSubmitted(false)
+	, m_bNextPhaseRequested(false)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -163,7 +164,7 @@ void CNightDlg::OnTimer(UINT_PTR nIDEvent)
 				m_cmbAction.EnableWindow(FALSE);
 				m_playerList.EnableWindow(FALSE);
 			}
-			OnOK(); // 다음 단계 요청
+			RequestPhaseChange(true); // 다음 단계 요청
 		}
 	}
 	CDialogEx::OnTimer(nIDEvent);
@@ -252,8 +253,7 @@ void CNightDlg::OnItemchangedPlayerList(NMHDR* pNMHDR, LRESULT* pResult)
 
 void CNightDlg::OnOK()
 {
-	if (m_pSocket) m_pSocket->SendJson("{\"op\": \"NEXT_PHASE\"}");
-	CDialogEx::OnOK();
+	RequestPhaseChange(true);
 }
 
 
@@ -322,10 +322,23 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	// 2. 낮으로 페이즈 전환 (내가 살았을 때만 실행됨)
 	else if (strJson.Find("\"phase\": \"DAY\"") != -1)
 	{
-		OnOK(); // 낮 화면으로 이동
+		RequestPhaseChange(false); // 낮 화면으로 이동
 	}
 
 	return 0;
+}
+
+void CNightDlg::RequestPhaseChange(bool bNotifyServer)
+{
+	if (m_bNextPhaseRequested)
+		return;
+
+	m_bNextPhaseRequested = true;
+
+	if (bNotifyServer && m_pSocket)
+		m_pSocket->SendJson("{\"op\": \"NEXT_PHASE\"}");
+
+	CDialogEx::OnOK();
 }
 
 // UI 핸들러들
