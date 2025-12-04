@@ -49,7 +49,6 @@ BEGIN_MESSAGE_MAP(CNightDlg, CDialogEx)
 	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_BTN_CONFIRM, &CNightDlg::OnBnClickedConfirm)
 	ON_BN_CLICKED(IDC_BTN_SEND, &CNightDlg::OnClickedSend)
-	ON_BN_CLICKED(IDC_BTN_SKIP, &CNightDlg::OnClickedSkip)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_LIST_PLAYERS, &CNightDlg::OnItemchangedPlayerList)
 	ON_EN_CHANGE(IDC_RE_CHATVIEW, &CNightDlg::OnEnChangeReChatview)
 	// ★ [필수] 서버 메시지 수신 핸들러 연결
@@ -161,7 +160,6 @@ void CNightDlg::OnTimer(UINT_PTR nIDEvent)
 
 				// UI 비활성화
 				m_btnConfirm.EnableWindow(FALSE);
-				GetDlgItem(IDC_BTN_SKIP)->EnableWindow(FALSE);
 				m_cmbAction.EnableWindow(FALSE);
 				m_playerList.EnableWindow(FALSE);
 			}
@@ -219,30 +217,10 @@ void CNightDlg::OnBnClickedConfirm()
 
 	m_bActionSubmitted = true;
 	m_btnConfirm.EnableWindow(FALSE);
-	GetDlgItem(IDC_BTN_SKIP)->EnableWindow(FALSE);
 	m_cmbAction.EnableWindow(FALSE);
 	m_playerList.EnableWindow(FALSE);
 }
 
-void CNightDlg::OnClickedSkip()
-{
-	if (m_bActionSubmitted) return;
-
-	if (m_pSocket)
-	{
-		CStringA strJson;
-		strJson.Format("{\"op\": \"NIGHT_ACTION\", \"target\": \"NONE\"}");
-		m_pSocket->SendJson(strJson);
-	}
-
-	AppendChat(_T("행동 건너뛰기 (NONE)를 제출했습니다.\r\n"));
-
-	m_bActionSubmitted = true;
-	m_btnConfirm.EnableWindow(FALSE);
-	GetDlgItem(IDC_BTN_SKIP)->EnableWindow(FALSE);
-	m_cmbAction.EnableWindow(FALSE);
-	m_playerList.EnableWindow(FALSE);
-}
 
 void CNightDlg::OnClickedSend()
 {

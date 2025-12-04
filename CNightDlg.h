@@ -39,7 +39,6 @@ protected:
 	// 핸들러 함수들
 	afx_msg void OnBnClickedConfirm();
 	afx_msg void OnClickedSend();
-	afx_msg void OnClickedSkip();
 	afx_msg void OnItemchangedPlayerList(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnEnChangeReChatview();
