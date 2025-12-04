@@ -573,6 +573,15 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 			}
 		}
 
+		// [디버그] 파싱 결과 확인
+		CString dbgMsg;
+		dbgMsg.Format(_T("[디버그] UID: %s, number 필드 찾음: %s, 파싱된 번호: %d\n원본 JSON: %s"),
+			CStrA_to_CStr(strUid),
+			(kNumber != -1) ? _T("예") : _T("아니오"),
+			nPlayerNumber,
+			CStrA_to_CStr(strPlayerObj));
+		AfxMessageBox(dbgMsg);
+
 		// 3) Alive 추출 (기존 로직 유지)
 		CStringA strAlive = "false";
 		if (strCleanObj.Find("\"alive\":true") != -1) strAlive = "true";
