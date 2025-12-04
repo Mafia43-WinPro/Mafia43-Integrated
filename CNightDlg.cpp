@@ -210,7 +210,8 @@ void CNightDlg::OnClickedSend()
 	if (m_pSocket) {
 		CStringA strJson;
 		CT2A asciiMsg(msg, CP_UTF8);
-		strJson.Format("{\"op\": \"NIGHT_CHAT\", \"text\": \"%s\"}", (LPCSTR)asciiMsg);
+		CStringA escapedText = EscapeJsonString(CStringA(asciiMsg));
+		strJson.Format("{\"op\": \"NIGHT_CHAT\", \"text\": \"%s\"}", (LPCSTR)escapedText);
 		m_pSocket->SendJson(strJson);
 	}
 
@@ -298,12 +299,42 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	// 3. 채팅
 	else if (strJson.Find("\"op\": \"CHAT\"") != -1 || strJson.Find("\"op\": \"MAFIA_CHAT\"") != -1)
 	{
+		// 디버깅: JSON 원본 출력 (프로그램 실행 폴더에 저장)
+		FILE* fp = nullptr;
+		if (fopen_s(&fp, "chat_debug.txt", "a") == 0 && fp) {
+			fprintf(fp, "=== Received JSON (Night) ===\n%s\n\n", strJson.GetString());
+			fclose(fp);
+		}
+
 		CString text = _T("");
+		CStringA sText = "";
 		int nText = strJson.Find("\"text\": \"");
 		if (nText != -1) {
-			CStringA sText = strJson.Mid(nText + 9);
-			int nEnd = sText.Find('\"');
-			if (nEnd != -1) sText = sText.Left(nEnd);
+			sText = strJson.Mid(nText + 9);  // "text": " 다음부터
+		} else {
+			nText = strJson.Find("\"text\":\"");  // 공백 없는 경우
+			if (nText != -1) {
+				sText = strJson.Mid(nText + 8);  // "text":" 다음부터
+			}
+		}
+
+		if (!sText.IsEmpty()) {
+			// UTF-8 바이트를 바이트 레벨에서 검색 (strchr 사용)
+			const char* pText = sText.GetString();
+			const char* pQuote = strchr(pText, '\"');
+
+			if (pQuote == nullptr) {
+				// 닫는 따옴표를 못 찾음 - 파싱 에러
+				FILE* fp = nullptr;
+				if (fopen_s(&fp, "chat_debug.txt", "a") == 0 && fp) {
+					fprintf(fp, "[ERROR] Cannot find closing quote in: %s\n\n", sText.GetString());
+					fclose(fp);
+				}
+				return 0;  // 에러 발생 시 메시지 표시 안 함
+			}
+
+			int nEnd = (int)(pQuote - pText);
+			sText = sText.Left(nEnd);
 			text = CString(CA2T(sText, CP_UTF8));
 		}
 
@@ -382,4 +413,32 @@ BOOL CNightDlg::PreTranslateMessage(MSG* pMsg)
 		if (pMsg->wParam == VK_ESCAPE) return TRUE;
 	}
 	return CDialogEx::PreTranslateMessage(pMsg);
+}
+
+CStringA CNightDlg::EscapeJsonString(const CStringA& str)
+{
+	CStringA result;
+	for (int i = 0; i < str.GetLength(); i++) {
+		unsigned char c = (unsigned char)str[i];  // unsigned로 처리!
+		switch (c) {
+		case '\"': result += "\\\""; break;
+		case '\\': result += "\\\\"; break;
+		case '\b': result += "\\b"; break;
+		case '\f': result += "\\f"; break;
+		case '\n': result += "\\n"; break;
+		case '\r': result += "\\r"; break;
+		case '\t': result += "\\t"; break;
+		default:
+			if (c < 0x20) {
+				// 제어 문자는 \uXXXX 형태로
+				CStringA hex;
+				hex.Format("\\u%04x", c);
+				result += hex;
+			}
+			else {
+				result += (char)c;  // 다시 char로 변환하여 추가
+			}
+		}
+	}
+	return result;
 }
