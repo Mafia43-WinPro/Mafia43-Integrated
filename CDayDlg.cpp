@@ -3,6 +3,7 @@
 #include "Mafia43.h"
 #include "CDayDlg.h"
 #include "afxdialogex.h"
+#include "SharedStructures.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -89,14 +90,17 @@ void CDayDlg::PopulateVoteList()
 	int nItem = 0;
 	for (const auto& player : m_vecDayPlayers)
 	{
-		// ★ 살아있는 사람만 리스트에 추가 (죽은 사람은 여기서 걸러짐)
-		if (player.bIsAlive)
-		{
-			m_listVote.InsertItem(nItem, player.strUID);
-			m_listVote.SetItemText(nItem, 1, player.strName);
-			m_listVote.SetItemText(nItem, 2, _T("생존"));
-			nItem++;
-		}
+		// 모든 플레이어 표시 (죽은 플레이어도 포함)
+		CString strDisplayName;
+		strDisplayName.Format(_T("Player%d"), player.nPlayerNumber);
+
+		m_listVote.InsertItem(nItem, player.strUID);
+		m_listVote.SetItemText(nItem, 1, strDisplayName);
+
+		// 상태를 올바르게 표시
+		m_listVote.SetItemText(nItem, 2, player.bIsAlive ? _T("생존") : _T("사망"));
+
+		nItem++;
 	}
 }
 
@@ -164,7 +168,15 @@ void CDayDlg::OnBnClickedButtonVote()
 	if (nItem == -1) { AfxMessageBox(_T("투표할 대상을 선택하세요.")); return; }
 
 	CString strTargetUID = m_listVote.GetItemText(nItem, 0);
+	CString strTargetStatus = m_listVote.GetItemText(nItem, 2);
+
 	if (strTargetUID == m_strMyUID) { AfxMessageBox(_T("자신에게 투표할 수 없습니다.")); return; }
+
+	// 죽은 플레이어에게 투표 방지
+	if (strTargetStatus == _T("사망")) {
+		AfxMessageBox(_T("사망한 플레이어에게 투표할 수 없습니다."));
+		return;
+	}
 
 	if (m_pSocket) {
 		CStringA strJson;
@@ -191,11 +203,28 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 	else if (strJsonA.Find("\"op\": \"DAY_RESULT\"") != -1)
 	{
 		CString strVictim = _T("");
+		int nVictimNumber = 0;
+
+		// victim UID 파싱
 		int nVic = strJsonA.Find("\"victim\": \"");
 		if (nVic != -1) {
 			CStringA sVal = strJsonA.Mid(nVic + 11);
 			sVal = sVal.Left(sVal.Find('\"'));
 			strVictim = CString(CA2T(sVal));
+		}
+
+		// victim_number 파싱
+		int nVicNum = strJsonA.Find("\"victim_number\"");
+		if (nVicNum != -1) {
+			int c = strJsonA.Find(':', nVicNum);
+			CStringA numStr = strJsonA.Mid(c + 1);
+			numStr.Trim();
+			int endPos = numStr.FindOneOf(",}");
+			if (endPos != -1) {
+				numStr = numStr.Left(endPos);
+				numStr.Trim();
+				nVictimNumber = atoi(numStr);
+			}
 		}
 
 		if (!strVictim.IsEmpty()) {
@@ -206,7 +235,8 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 				return;
 			}
 			CString msg;
-			msg.Format(_T("[속보] %s 님이 처형되었습니다.\r\n"), (LPCTSTR)strVictim);
+			// Player{number} 형식으로 표시
+			msg.Format(_T("[속보] Player%d 님이 처형되었습니다.\r\n"), nVictimNumber);
 			AppendTextToRichEdit(msg, RGB(255, 0, 0));
 		}
 		else {
@@ -245,14 +275,29 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 
 void CDayDlg::ParseChat(const CStringA& strJsonA)
 {
-	int nFrom = strJsonA.Find("\"from\": \"");
+	// from_number 필드 파싱
+	int nFromNumber = 0;
+	int nFromNumPos = strJsonA.Find("\"from_number\"");
+	if (nFromNumPos != -1) {
+		int c = strJsonA.Find(':', nFromNumPos);
+		CStringA numStr = strJsonA.Mid(c + 1);
+		numStr.Trim();
+		int endPos = numStr.FindOneOf(",}");
+		if (endPos != -1) {
+			numStr = numStr.Left(endPos);
+			numStr.Trim();
+			nFromNumber = atoi(numStr);
+		}
+	}
+
 	int nText = strJsonA.Find("\"text\": \"");
-	if (nFrom != -1 && nText != -1) {
-		CStringA sFrom = strJsonA.Mid(nFrom + 9); sFrom = sFrom.Left(sFrom.Find('\"'));
-		CStringA sText = strJsonA.Mid(nText + 9); sText = sText.Left(sText.Find('\"'));
+	if (nText != -1) {
+		CStringA sText = strJsonA.Mid(nText + 9);
+		sText = sText.Left(sText.Find('\"'));
 
 		CString msg;
-		msg.Format(_T("%s: %s"), (LPCTSTR)CStrA_to_CStr(sFrom), (LPCTSTR)CStrA_to_CStr(sText));
+		// Player{number} 형식으로 표시
+		msg.Format(_T("Player%d: %s"), nFromNumber, (LPCTSTR)CStrA_to_CStr(sText));
 		AppendTextToRichEdit(msg);
 	}
 }

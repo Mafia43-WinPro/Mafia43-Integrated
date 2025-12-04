@@ -4,9 +4,11 @@
 #include "CClientSocket.h" // 1. CClientSocket 헤더 추가
 #include "Resource.h"
 #include <vector>
-#include "CNightDlg.h"
+#include "SharedStructures.h" // 공유 구조체 정의
 
+// Forward declarations
 class CNightDlg;
+class CDayDlg;
 
 // ▼▼▼ CClientSocket에서 보낼 사용자 정의 메시지 ID ▼▼▼
 #define WM_USER_CONNECT_SUCCESS (WM_USER + 100) // 접속 성공
@@ -14,13 +16,6 @@ class CNightDlg;
 #define WM_USER_RECV_MSG        (WM_USER + 102) // 메시지 수신
 #define WM_USER_SERVER_CLOSE    (WM_USER + 103) // 서버 끊김
 #define WM_USER_GAME_START      (WM_USER + 104) // 게임 시작 신호
-
-struct RoomPlayerInfo {
-	CString strUID;
-	CString strName;
-	bool bIsAlive;
-	bool bIsHost;
-};
 
 // CMafia43Dlg 대화 상자
 class CMafia43Dlg : public CDialogEx

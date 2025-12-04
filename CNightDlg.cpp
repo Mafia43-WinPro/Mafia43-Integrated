@@ -5,6 +5,7 @@
 #include "CNightDlg.h"     // 밤 화면 헤더
 #include "afxdialogex.h"
 #include "resource.h"
+#include "SharedStructures.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -117,12 +118,14 @@ BOOL CNightDlg::OnInitDialog()
 void CNightDlg::InitPlayerList()
 {
 	m_playerList.DeleteAllItems();
-	for (const auto& p : m_players)
+	for (size_t i = 0; i < m_players.size(); i++)
 	{
+		const auto& p = m_players[i];
 		if (!p.alive) continue;
 		// p.name에는 "Player1", "Player2" 등의 이름이 들어있어야 함
 		int row = m_playerList.InsertItem(m_playerList.GetItemCount(), p.name);
-		m_playerList.SetItemData(row, p.id);
+		// SetItemData에 m_players 벡터의 인덱스 저장 (나중에 UID를 찾기 위해)
+		m_playerList.SetItemData(row, static_cast<DWORD_PTR>(i));
 	}
 }
 
@@ -182,41 +185,31 @@ void CNightDlg::OnBnClickedConfirm()
 
 	// 2. 리스트에서 선택한 대상 확인
 	int item = m_playerList.GetNextItem(-1, LVNI_SELECTED);
+	CString targetUID = _T("");
 	CString targetName = _T("");
 	CString targetUID = _T(""); //  보낼 ID
 
+	// 리스트에서 선택한 항목의 인덱스를 가져와서 UID 찾기
 	if (item != -1) {
-		targetName = m_playerList.GetItemText(item, 0); // 화면에 보이는 이름
-
-		// 벡터에서 진짜 UID 꺼내기
-		if (item >= 0 && item < m_players.size()) {
-			targetUID = m_players[item].uid;
+		DWORD_PTR index = m_playerList.GetItemData(item);
+		if (index < m_players.size()) {
+			targetUID = m_players[index].strUID;  // 서버로 보낼 UID
+			targetName = m_players[index].name;    // 로그 표시용
 		}
 	}
 
-	// 3. 유효성 검사
 	if (action != _T("NONE") && targetUID.IsEmpty()) {
-		AfxMessageBox(_T("오류: 타겟의 UID를 찾을 수 없습니다! (데이터 전달 문제)"));
+		AfxMessageBox(_T("대상을 선택하세요!"));
 		return;
 	}
 
 	// 4. 서버 전송 및 디버깅 팝업
 	if (m_pSocket)
 	{
+		// 서버로 UID 전송
 		CStringA strJson;
-		if (action == _T("NONE")) {
-			strJson.Format("{\"op\": \"NIGHT_ACTION\", \"target\": \"NONE\"}");
-		}
-		else {
-			strJson.Format("{\"op\": \"NIGHT_ACTION\", \"target\": \"%s\"}", (LPCSTR)CT2A(targetUID));
-		}
-
-		// 확인용 팝업!!!!!!
-		CString msg;
-		msg.Format(_T("[디버그] 서버로 보내는 데이터:\n%S"), strJson.GetString());
-		AfxMessageBox(msg);
-		// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
+		CT2A asciiTarget(targetUID);
+		strJson.Format("{\"op\": \"NIGHT_ACTION\", \"target\": \"%s\"}", (LPCSTR)asciiTarget);
 		m_pSocket->SendJson(strJson);
 	}
 
@@ -299,33 +292,42 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	if (strJson.Find("\"op\": \"NIGHT_RESULT\"") != -1)
 	{
 		CString strVictim = _T("");
+		int nVictimNumber = 0;
+
+		// victim UID 파싱
 		int nVic = strJson.Find("\"victim\": \"");
 		if (nVic != -1) {
 			CStringA sVal = strJson.Mid(nVic + 11);
 			sVal = sVal.Left(sVal.Find('\"'));
-			strVictim = CString(CA2T(sVal)); // 죽은 사람 UID
+			strVictim = CString(CA2T(sVal));
 		}
+
+		// victim_number 파싱
+		int nVicNum = strJson.Find("\"victim_number\"");
+		if (nVicNum != -1) {
+			int c = strJson.Find(':', nVicNum);
+			CStringA numStr = strJson.Mid(c + 1);
+			numStr.Trim();
+			int endPos = numStr.FindOneOf(",}");
+			if (endPos != -1) {
+				numStr = numStr.Left(endPos);
+				numStr.Trim();
+				nVictimNumber = atoi(numStr);
+			}
+		}
+
 		bool bSaved = (strJson.Find("\"saved\": true") != -1);
 
-		// ★ [핵심] 죽은 사람이 나(UID)라면? -> 로비로 강퇴
-		if (!strVictim.IsEmpty() && !bSaved)
-		{
-			// 내 UID를 가져올 방법이 없으므로, 닉네임에 포함되어 있는지 등으로 체크
-			// (안전을 위해 낮 화면 진입 시 한 번 더 체크하지만, 여기서 나가면 더 빠름)
-			if (m_strMyNickname.Find(strVictim) != -1)
-			{
-				KillTimer(1);
-				AfxMessageBox(_T("마피아에게 습격당해 사망했습니다. 로비로 돌아갑니다."));
-				EndDialog(IDCANCEL); // ★ IDCANCEL을 리턴하면 게임 루프가 깨지고 로비로 감
-				return 0;
-			}
-			else
-			{
-				// 다른 사람이 죽음
-				CString msg;
-				msg.Format(_T("[속보] %s 님이 습격당했습니다.\r\n"), strVictim);
-				AppendChat(msg);
-			}
+		if (!strVictim.IsEmpty() && !bSaved) {
+			// Player{number} 형식으로 표시
+			CString msg;
+			msg.Format(_T("[속보] Player%d 님이 마피아에게 습격당했습니다.\r\n"), nVictimNumber);
+			AppendChat(msg);
+		}
+		else if (!strVictim.IsEmpty() && bSaved) {
+			CString msg;
+			msg.Format(_T("[알림] Player%d 님이 의사에게 보호받았습니다.\r\n"), nVictimNumber);
+			AppendChat(msg);
 		}
 	}
 
