@@ -1,7 +1,10 @@
 // SharedStructures.h - Common data structures shared across dialogs
 #pragma once
 
-#include <afxwin.h>
+#ifndef SHARED_STRUCTURES_H
+#define SHARED_STRUCTURES_H
+
+// Note: This header requires MFC headers (CString) to be included first via pch.h
 
 // Player information structure used in lobby/room
 struct RoomPlayerInfo {
@@ -17,3 +20,5 @@ struct PlayerInfo {
 	CString name;
 	bool alive;
 };
+
+#endif // SHARED_STRUCTURES_H
