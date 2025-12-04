@@ -359,7 +359,12 @@ void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 			int c = strPlayerObj.Find(':', kUid);
 			int s = strPlayerObj.Find('\"', c + 1);
 			int e = strPlayerObj.Find('\"', s + 1);
-			if (s != -1 && e != -1) strUid = strPlayerObj.Mid(s + 1, e - s - 1);
+			if (s != -1 && e != -1)
+			{
+				strUid = strPlayerObj.Mid(s + 1, e - s - 1);
+
+				strUid.Trim();
+			}
 		}
 
 		CStringA strName = "";
@@ -368,7 +373,12 @@ void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 			int c = strPlayerObj.Find(':', kName);
 			int s = strPlayerObj.Find('\"', c + 1);
 			int e = strPlayerObj.Find('\"', s + 1);
-			if (s != -1 && e != -1) strName = strPlayerObj.Mid(s + 1, e - s - 1);
+			if (s != -1 && e != -1)
+			{
+				strName = strPlayerObj.Mid(s + 1, e - s - 1);
+
+				strUid.Trim();
+			}
 		}
 
 		// Player Number 추출
