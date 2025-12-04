@@ -328,36 +328,18 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-// Mafia43Dlg.cpp
-
-// ... (기존 코드들) ...
-
-// ▼▼▼ [추가] 엔터키 동작 차단 함수 구현 ▼▼▼
-BOOL CNightDlg::PreTranslateMessage(MSG* pMsg)
+void CNightDlg::RequestPhaseChange(bool bNotifyServer)
 {
-	// 키보드 누름 메시지인지 확인
-	if (pMsg->message == WM_KEYDOWN)
-	{
-		// 눌린 키가 엔터(VK_RETURN)인지 확인
-		if (pMsg->wParam == VK_RETURN)
-		{
-			// TRUE를 반환하면 메시지를 소비하고 더 이상 전달하지 않음 (즉, 아무 동작 안 함)
-			return TRUE;
-		}
+	if (m_bNextPhaseRequested)
+		return;
 
-		// (선택사항) ESC키로 꺼지는 것도 막고 싶다면 아래 주석을 해제하세요.
-		
-		if (pMsg->wParam == VK_ESCAPE)
-		{
-			return TRUE;
-		}
-		
-	}
+	m_bNextPhaseRequested = true;
 
-	// 그 외의 메시지는 부모 클래스에서 정상 처리
-	return CDialogEx::PreTranslateMessage(pMsg);
+	if (bNotifyServer && m_pSocket)
+		m_pSocket->SendJson("{\"op\": \"NEXT_PHASE\"}");
+
+	CDialogEx::OnOK();
 }
-
 
 // UI 핸들러들
 void CNightDlg::OnSysCommand(UINT nID, LPARAM lParam) { CDialogEx::OnSysCommand(nID, lParam); }

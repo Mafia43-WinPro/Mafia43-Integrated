@@ -24,8 +24,6 @@ class CMafia43Dlg : public CDialogEx
 public:
 	CMafia43Dlg(CWnd* pParent = nullptr);	// 표준 생성자입니다.
 
-	virtual BOOL PreTranslateMessage(MSG* pMsg);
-
 	// --- 2. 소켓 및 상태 변수 추가 ---
 	CClientSocket m_Socket;   // 비동기 소켓 멤버
 	CString m_strMyUID;     // 서버가 발급한 내 ID

@@ -783,31 +783,5 @@ CString CMafia43Dlg::CStrA_to_CStr(const CStringA& strA)
 	CA2T utf8(strA, CP_UTF8);
 	return CString(utf8);
 }
-
-BOOL CMafia43Dlg::PreTranslateMessage(MSG* pMsg)
-{
-	// 키보드 누름 메시지인지 확인
-	if (pMsg->message == WM_KEYDOWN)
-	{
-		// 눌린 키가 엔터(VK_RETURN)인지 확인
-		if (pMsg->wParam == VK_RETURN)
-		{
-			// TRUE를 반환하면 메시지를 소비하고 더 이상 전달하지 않음 (즉, 아무 동작 안 함)
-			return TRUE;
-		}
-
-		// (선택사항) ESC키로 꺼지는 것도 막고 싶다면 아래 주석을 해제하세요.
-		
-		if (pMsg->wParam == VK_ESCAPE)
-		{
-			return TRUE;
-		}
-		
-	}
-
-	// 그 외의 메시지는 부모 클래스에서 정상 처리
-	return CDialogEx::PreTranslateMessage(pMsg);
-}
-
 void CMafia43Dlg::OnLvnItemchangedListPlayers(NMHDR* pNMHDR, LRESULT* pResult) { *pResult = 0; }
 void CMafia43Dlg::OnStnClickedPicBackground() {}
