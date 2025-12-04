@@ -19,6 +19,7 @@ struct RoomPlayerInfo {
 struct PlayerInfo {
 	int id;
 	int nPlayerNumber;  // 플레이어 번호
+	CString strUID;     // 서버로 보낼 UID
 	CString name;
 	bool alive;
 };

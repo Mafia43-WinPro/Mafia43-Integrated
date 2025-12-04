@@ -672,6 +672,7 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 				// CNightDlg의 PlayerInfo 구조체에 맞춰 데이터 변환
 				nightPlayer.id = roomPlayer.nPlayerNumber;  // 서버 플레이어 번호 사용
 				nightPlayer.nPlayerNumber = roomPlayer.nPlayerNumber;
+				nightPlayer.strUID = roomPlayer.strUID;  // UID 저장 (서버로 보낼 때 사용)
 
 				// Player{number} 형식으로 이름 생성
 				CString strDisplayName;

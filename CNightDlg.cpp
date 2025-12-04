@@ -118,12 +118,14 @@ BOOL CNightDlg::OnInitDialog()
 void CNightDlg::InitPlayerList()
 {
 	m_playerList.DeleteAllItems();
-	for (const auto& p : m_players)
+	for (size_t i = 0; i < m_players.size(); i++)
 	{
+		const auto& p = m_players[i];
 		if (!p.alive) continue;
 		// p.name에는 "Player1", "Player2" 등의 이름이 들어있어야 함
 		int row = m_playerList.InsertItem(m_playerList.GetItemCount(), p.name);
-		m_playerList.SetItemData(row, p.id);
+		// SetItemData에 m_players 벡터의 인덱스 저장 (나중에 UID를 찾기 위해)
+		m_playerList.SetItemData(row, static_cast<DWORD_PTR>(i));
 	}
 }
 
@@ -179,28 +181,28 @@ void CNightDlg::OnBnClickedConfirm()
 	else action = _T("NONE");
 
 	int item = m_playerList.GetNextItem(-1, LVNI_SELECTED);
+	CString targetUID = _T("");
 	CString targetName = _T("");
 
-	// ★ 주의: 여기서 선택한 것은 '이름'이지만, 서버에는 UID를 보내야 정확합니다.
-	// 하지만 현재 구조상 UI에서 UID를 숨겨두지 않았다면 이름을 보낼 수밖에 없습니다.
-	// (서버가 이름을 받아서 처리하는지는 서버 코드에 따라 다름. 현재 서버는 UID 기준임)
-	// 일단 리스트에 보이는 텍스트(이름)를 보냅니다.
+	// 리스트에서 선택한 항목의 인덱스를 가져와서 UID 찾기
 	if (item != -1) {
-		targetName = m_playerList.GetItemText(item, 0);
+		DWORD_PTR index = m_playerList.GetItemData(item);
+		if (index < m_players.size()) {
+			targetUID = m_players[index].strUID;  // 서버로 보낼 UID
+			targetName = m_players[index].name;    // 로그 표시용
+		}
 	}
 
-	if (action != _T("NONE") && targetName.IsEmpty()) {
+	if (action != _T("NONE") && targetUID.IsEmpty()) {
 		AfxMessageBox(_T("대상을 선택하세요!"));
 		return;
 	}
 
 	if (m_pSocket)
 	{
-		// 지금은 target에 '이름(Player1)'을 보내고 있습니다. 
-		// (만약 서버가 UID만 인식한다면 동작 안 할 수 있음. 이 경우 m_players에서 매칭 필요)
-		// 일단 진행.
+		// 서버로 UID 전송
 		CStringA strJson;
-		CT2A asciiTarget(targetName);
+		CT2A asciiTarget(targetUID);
 		strJson.Format("{\"op\": \"NIGHT_ACTION\", \"target\": \"%s\"}", (LPCSTR)asciiTarget);
 		m_pSocket->SendJson(strJson);
 	}
