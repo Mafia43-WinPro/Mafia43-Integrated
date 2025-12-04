@@ -333,7 +333,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 			msg.Format(_T("%s: %s\r\n"), (LPCTSTR)sender, (LPCTSTR)CString(CA2T(sText, CP_UTF8)));
 			AppendChat(msg);
 		}
-	}
+	}ㅇㅇ
 	// 4. 게임 종료
 	else if (strJson.Find("\"op\": \"GAME_END\"") != -1)
 	{
