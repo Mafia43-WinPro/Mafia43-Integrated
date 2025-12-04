@@ -6,7 +6,8 @@
 // 플레이어 정보 구조체
 struct PlayerInfo {
 	int id;
-	CString name;
+	CString name; //화면에 보여줄 이름 (player1, player2 등)
+	CString uid; //서버에 보낼 ID (서버 통신용)
 	bool alive;
 };
 

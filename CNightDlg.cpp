@@ -168,42 +168,59 @@ void CNightDlg::OnTimer(UINT_PTR nIDEvent)
 	CDialogEx::OnTimer(nIDEvent);
 }
 
+// CNightDlg.cpp
+
 void CNightDlg::OnBnClickedConfirm()
 {
 	if (m_bActionSubmitted) return;
 
+	// 1. 선택한 행동 가져오기
 	int sel = m_cmbAction.GetCurSel();
 	CString action;
 	if (sel >= 0) m_cmbAction.GetLBText(sel, action);
 	else action = _T("NONE");
 
+	// 2. 리스트에서 선택한 대상 확인
 	int item = m_playerList.GetNextItem(-1, LVNI_SELECTED);
 	CString targetName = _T("");
+	CString targetUID = _T(""); //  보낼 ID
 
-	// ★ 주의: 여기서 선택한 것은 '이름'이지만, 서버에는 UID를 보내야 정확합니다.
-	// 하지만 현재 구조상 UI에서 UID를 숨겨두지 않았다면 이름을 보낼 수밖에 없습니다.
-	// (서버가 이름을 받아서 처리하는지는 서버 코드에 따라 다름. 현재 서버는 UID 기준임)
-	// 일단 리스트에 보이는 텍스트(이름)를 보냅니다.
 	if (item != -1) {
-		targetName = m_playerList.GetItemText(item, 0);
+		targetName = m_playerList.GetItemText(item, 0); // 화면에 보이는 이름
+
+		// 벡터에서 진짜 UID 꺼내기
+		if (item >= 0 && item < m_players.size()) {
+			targetUID = m_players[item].uid;
+		}
 	}
 
-	if (action != _T("NONE") && targetName.IsEmpty()) {
-		AfxMessageBox(_T("대상을 선택하세요!"));
+	// 3. 유효성 검사
+	if (action != _T("NONE") && targetUID.IsEmpty()) {
+		AfxMessageBox(_T("오류: 타겟의 UID를 찾을 수 없습니다! (데이터 전달 문제)"));
 		return;
 	}
 
+	// 4. 서버 전송 및 디버깅 팝업
 	if (m_pSocket)
 	{
-		// 지금은 target에 '이름(Player1)'을 보내고 있습니다. 
-		// (만약 서버가 UID만 인식한다면 동작 안 할 수 있음. 이 경우 m_players에서 매칭 필요)
-		// 일단 진행.
 		CStringA strJson;
-		CT2A asciiTarget(targetName);
-		strJson.Format("{\"op\": \"NIGHT_ACTION\", \"target\": \"%s\"}", (LPCSTR)asciiTarget);
+		if (action == _T("NONE")) {
+			strJson.Format("{\"op\": \"NIGHT_ACTION\", \"target\": \"NONE\"}");
+		}
+		else {
+			strJson.Format("{\"op\": \"NIGHT_ACTION\", \"target\": \"%s\"}", (LPCSTR)CT2A(targetUID));
+		}
+
+		// 확인용 팝업!!!!!!
+		CString msg;
+		msg.Format(_T("[디버그] 서버로 보내는 데이터:\n%S"), strJson.GetString());
+		AfxMessageBox(msg);
+		// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
 		m_pSocket->SendJson(strJson);
 	}
 
+	// 5. 로그 및 UI 처리 
 	CString log;
 	log.Format(_T("[시스템] '%s'님에게 능력을 사용했습니다.\r\n"), targetName);
 	AppendChat(log);
@@ -269,7 +286,8 @@ void CNightDlg::OnOK()
 	CDialogEx::OnOK();
 }
 
-// ★ [핵심] 서버 메시지 수신 (결과 확인)
+// CNightDlg.cpp 안의 OnReceiveMsg 함수
+
 LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 {
 	CStringA* pJsonA = (CStringA*)wParam;
@@ -277,7 +295,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	CStringA strJson = *pJsonA;
 	delete pJsonA;
 
-	// 1. 밤 결과 확인
+	// 1. 밤 결과 확인 (누가 죽었나?)
 	if (strJson.Find("\"op\": \"NIGHT_RESULT\"") != -1)
 	{
 		CString strVictim = _T("");
@@ -285,23 +303,38 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 		if (nVic != -1) {
 			CStringA sVal = strJson.Mid(nVic + 11);
 			sVal = sVal.Left(sVal.Find('\"'));
-			strVictim = CString(CA2T(sVal)); // 여기에는 죽은 사람 UID가 들어옴
+			strVictim = CString(CA2T(sVal)); // 죽은 사람 UID
 		}
 		bool bSaved = (strJson.Find("\"saved\": true") != -1);
 
-		if (!strVictim.IsEmpty() && !bSaved) {
-			// 여기서는 누가 죽었는지만 알림 (UID로 옴)
-			// 실제 퇴장은 낮 화면(CDayDlg) 진입 시 처리
-			CString msg;
-			msg.Format(_T("[속보] 누군가(%s) 습격당했습니다.\r\n"), strVictim);
-			AppendChat(msg);
+		// ★ [핵심] 죽은 사람이 나(UID)라면? -> 로비로 강퇴
+		if (!strVictim.IsEmpty() && !bSaved)
+		{
+			// 내 UID를 가져올 방법이 없으므로, 닉네임에 포함되어 있는지 등으로 체크
+			// (안전을 위해 낮 화면 진입 시 한 번 더 체크하지만, 여기서 나가면 더 빠름)
+			if (m_strMyNickname.Find(strVictim) != -1)
+			{
+				KillTimer(1);
+				AfxMessageBox(_T("마피아에게 습격당해 사망했습니다. 로비로 돌아갑니다."));
+				EndDialog(IDCANCEL); // ★ IDCANCEL을 리턴하면 게임 루프가 깨지고 로비로 감
+				return 0;
+			}
+			else
+			{
+				// 다른 사람이 죽음
+				CString msg;
+				msg.Format(_T("[속보] %s 님이 습격당했습니다.\r\n"), strVictim);
+				AppendChat(msg);
+			}
 		}
 	}
-	// 2. 낮으로 페이즈 전환
+
+	// 2. 낮으로 이동
 	else if (strJson.Find("\"phase\": \"DAY\"") != -1)
 	{
 		OnOK(); // 낮 화면으로 이동
 	}
+
 	return 0;
 }
 

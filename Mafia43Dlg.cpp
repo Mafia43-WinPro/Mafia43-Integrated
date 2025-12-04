@@ -654,6 +654,7 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 				nightPlayer.id = tempIdCounter++;
 
 				// [핵심] CNightDlg의 name 필드에 UID 문자열을 저장하여 리스트에 표시되도록 합니다.
+				nightPlayer.uid = roomPlayer.strUID;
 				nightPlayer.name = roomPlayer.strName;
 				nightPlayer.alive = roomPlayer.bIsAlive;
 				nightPlayers.push_back(nightPlayer);
