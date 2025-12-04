@@ -1,4 +1,4 @@
-﻿// CDayDlg.cpp : 구현 파일
+// CDayDlg.cpp : 구현 파일
 #include "pch.h"
 #include "Mafia43.h"
 #include "Mafia43Dlg.h"
@@ -22,6 +22,7 @@ CDayDlg::CDayDlg(CWnd* pParent, CClientSocket* pSocket,
 	, m_strMyRole(strMyRole)
 	, m_vecDayPlayers(players)
 	, m_nDayTimeLimit(120) // 낮 시간 120초
+	, m_bNextPhaseRequested(false)
 {
 }
 
@@ -119,9 +120,7 @@ void CDayDlg::OnTimer(UINT_PTR nIDEvent)
 				}
 			}
 
-			if (bAmIHost && m_pSocket) {
-				m_pSocket->SendJson("{\"op\": \"NEXT_PHASE\"}");
-			}
+			RequestPhaseChange(true);
 		}
 	}
 	CDialogEx::OnTimer(nIDEvent);
@@ -256,7 +255,7 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 	else if (strJsonA.Find("\"phase\": \"NIGHT\"") != -1) {
 		KillTimer(1);
 		AppendTextToRichEdit(_T("[알림] 밤이 되었습니다.\r\n"), RGB(255, 0, 0));
-		OnOK();
+		RequestPhaseChange(false);
 	}
 	else if (strJsonA.Find("\"op\": \"GAME_END\"") != -1) {
 		KillTimer(1);
@@ -285,14 +284,49 @@ void CDayDlg::ParseChat(const CStringA& strJsonA)
 		}
 	}
 
+	CStringA strFromUID = ExtractJsonStringField(strJsonA, "from");
+	CStringA strFromName = ExtractJsonStringField(strJsonA, "from_name");
+
 	int nText = strJsonA.Find("\"text\": \"");
 	if (nText != -1) {
 		CStringA sText = strJsonA.Mid(nText + 9);
 		sText = sText.Left(sText.Find('\"'));
 
+		CString senderLabel;
+		const RoomPlayerInfo* pInfo = nullptr;
+
+		if (!strFromUID.IsEmpty())
+			pInfo = FindPlayerByUID(CStrA_to_CStr(strFromUID));
+
+		if (!pInfo && nFromNumber > 0)
+			pInfo = FindPlayerByNumber(nFromNumber);
+
+		if (!pInfo && !strFromName.IsEmpty())
+			pInfo = FindPlayerByName(CStrA_to_CStr(strFromName));
+
+		if (pInfo)
+		{
+			if (pInfo->nPlayerNumber > 0)
+				nFromNumber = pInfo->nPlayerNumber;
+
+			if (!pInfo->strName.IsEmpty())
+				senderLabel = pInfo->strName;
+		}
+
+		if (senderLabel.IsEmpty() && !strFromName.IsEmpty())
+			senderLabel = CStrA_to_CStr(strFromName);
+
+		if (senderLabel.IsEmpty() && nFromNumber > 0)
+		{
+			senderLabel.Format(_T("Player%d"), nFromNumber);
+		}
+		else if (senderLabel.IsEmpty() && !strFromUID.IsEmpty())
+		{
+			senderLabel = CStrA_to_CStr(strFromUID);
+		}
+
 		CString msg;
-		// Player{number} 형식으로 표시
-		msg.Format(_T("Player%d: %s"), nFromNumber, (LPCTSTR)CStrA_to_CStr(sText));
+		msg.Format(_T("%s: %s"), senderLabel.IsEmpty() ? _T("Player") : senderLabel, (LPCTSTR)CStrA_to_CStr(sText));
 		AppendTextToRichEdit(msg);
 	}
 }
@@ -392,3 +426,85 @@ void CDayDlg::ParseVoteResult(const CStringA& strJsonA) {}
 
 CStringA CDayDlg::CStr_to_CStrA(const CString& strT) { CT2A utf8(strT, CP_UTF8); return CStringA(utf8); }
 CString CDayDlg::CStrA_to_CStr(const CStringA& strA) { CA2T utf8(strA, CP_UTF8); return CString(utf8); }
+
+CStringA CDayDlg::ExtractJsonStringField(const CStringA& json, const CStringA& fieldName)
+{
+	CStringA clean = json;
+	clean.Replace(" ", "");
+	clean.Replace("\t", "");
+	clean.Replace("\r", "");
+	clean.Replace("\n", "");
+
+	CStringA key;
+	key.Format("\"%s\"", fieldName.GetString());
+	int pos = clean.Find(key);
+	if (pos == -1) return "";
+
+	int colon = clean.Find(':', pos);
+	if (colon == -1) return "";
+	int start = clean.Find('"', colon + 1);
+	if (start == -1) return "";
+	int end = clean.Find('"', start + 1);
+	if (end == -1) return "";
+
+	return clean.Mid(start + 1, end - start - 1);
+}
+
+const RoomPlayerInfo* CDayDlg::FindPlayerByUID(const CString& uid) const
+{
+	for (const auto& player : m_vecDayPlayers)
+	{
+		if (player.strUID == uid)
+			return &player;
+	}
+	return nullptr;
+}
+
+const RoomPlayerInfo* CDayDlg::FindPlayerByNumber(int number) const
+{
+	for (const auto& player : m_vecDayPlayers)
+	{
+		if (player.nPlayerNumber == number)
+			return &player;
+	}
+	return nullptr;
+}
+
+const RoomPlayerInfo* CDayDlg::FindPlayerByName(const CString& name) const
+{
+	for (const auto& player : m_vecDayPlayers)
+	{
+		if (player.strName == name)
+			return &player;
+	}
+	return nullptr;
+}
+
+void CDayDlg::OnOK()
+{
+	RequestPhaseChange(true);
+}
+
+void CDayDlg::RequestPhaseChange(bool bNotifyServer)
+{
+	if (m_bNextPhaseRequested)
+		return;
+
+	m_bNextPhaseRequested = true;
+
+	if (bNotifyServer && m_pSocket)
+	{
+		bool bAmIHost = false;
+		for (const auto& p : m_vecDayPlayers) {
+			if (p.strUID == m_strMyUID && p.bIsHost) {
+				bAmIHost = true;
+				break;
+			}
+		}
+
+		if (bAmIHost)
+			m_pSocket->SendJson("{\"op\": \"NEXT_PHASE\"}");
+	}
+
+	CDialogEx::OnOK();
+}
