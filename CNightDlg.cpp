@@ -3,6 +3,7 @@
 #include "pch.h"
 #include "Mafia43.h"       // 프로젝트 메인 헤더
 #include "CNightDlg.h"     // 밤 화면 헤더
+#include "Mafia43Dlg.h"    // ★ 부모 대화상자 헤더 (필수)
 #include "afxdialogex.h"
 #include "resource.h"
 #include "SharedStructures.h"
@@ -17,7 +18,7 @@ IMPLEMENT_DYNAMIC(CNightDlg, CDialogEx)
 CNightDlg::CNightDlg(const std::vector<PlayerInfo>& players, CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_NIGHT_DIALOG, pParent)
 	, m_pSocket(nullptr)
-	, m_timeLeftSec(60) // ★ [수정] 밤 시간 60초로 설정
+	, m_timeLeftSec(60) // 밤 시간 60초
 	, m_players(players)
 	, m_bActionSubmitted(false)
 	, m_bNextPhaseRequested(false)
@@ -52,7 +53,6 @@ BEGIN_MESSAGE_MAP(CNightDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_SEND, &CNightDlg::OnClickedSend)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_LIST_PLAYERS, &CNightDlg::OnItemchangedPlayerList)
 	ON_EN_CHANGE(IDC_RE_CHATVIEW, &CNightDlg::OnEnChangeReChatview)
-	// ★ [필수] 서버 메시지 수신 핸들러 연결
 	ON_MESSAGE(WM_USER_RECV_MSG, &CNightDlg::OnReceiveMsg)
 END_MESSAGE_MAP()
 
@@ -62,7 +62,7 @@ BOOL CNightDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
-	// 시스템 메뉴 설정 (생략 가능하지만 유지)
+	// 시스템 메뉴 설정
 	ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
 	ASSERT(IDM_ABOUTBOX < 0xF000);
 	CMenu* pSysMenu = GetSystemMenu(FALSE);
@@ -84,12 +84,12 @@ BOOL CNightDlg::OnInitDialog()
 
 	// 1. 리스트 컨트롤 설정
 	m_playerList.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
-	// 이름 컬럼 (UID 대신 이름 표시)
 	m_playerList.InsertColumn(0, _T("플레이어"), LVCFMT_LEFT, 140);
 
 	// 2. 역할 및 타이머 표시
 	CString strRoleText;
-	strRoleText.Format(_T("역할: %s"), m_strMyRole);
+	// ★ [수정] CString을 넘길 때 (LPCTSTR)로 형변환 필수
+	strRoleText.Format(_T("역할: %s"), (LPCTSTR)m_strMyRole);
 	m_lblRole.SetWindowText(strRoleText);
 
 	m_lblTimer.SetWindowText(_T("남은 시간: 60초"));
@@ -122,9 +122,9 @@ void CNightDlg::InitPlayerList()
 	{
 		const auto& p = m_players[i];
 		if (!p.alive) continue;
-		// p.name에는 "Player1", "Player2" 등의 이름이 들어있어야 함
+
+		// p.name은 CString이므로 그대로 사용 가능 (InsertItem은 오버로딩 되어 있음)
 		int row = m_playerList.InsertItem(m_playerList.GetItemCount(), p.name);
-		// SetItemData에 m_players 벡터의 인덱스 저장 (나중에 UID를 찾기 위해)
 		m_playerList.SetItemData(row, static_cast<DWORD_PTR>(i));
 	}
 }
@@ -159,40 +159,34 @@ void CNightDlg::OnTimer(UINT_PTR nIDEvent)
 				if (m_pSocket)
 					m_pSocket->SendJson("{\"op\": \"NIGHT_ACTION\", \"target\": \"NONE\"}");
 
-				// UI 비활성화
 				m_btnConfirm.EnableWindow(FALSE);
 				m_cmbAction.EnableWindow(FALSE);
 				m_playerList.EnableWindow(FALSE);
 			}
-			RequestPhaseChange(true); // 다음 단계 요청
+			RequestPhaseChange(true);
 		}
 	}
 	CDialogEx::OnTimer(nIDEvent);
 }
 
-// CNightDlg.cpp
-
 void CNightDlg::OnBnClickedConfirm()
 {
 	if (m_bActionSubmitted) return;
 
-	// 1. 선택한 행동 가져오기
 	int sel = m_cmbAction.GetCurSel();
 	CString action;
 	if (sel >= 0) m_cmbAction.GetLBText(sel, action);
 	else action = _T("NONE");
 
-	// 2. 리스트에서 선택한 대상 확인
 	int item = m_playerList.GetNextItem(-1, LVNI_SELECTED);
 	CString targetUID = _T("");
 	CString targetName = _T("");
 
-	// 리스트에서 선택한 항목의 인덱스를 가져와서 UID 찾기
 	if (item != -1) {
 		DWORD_PTR index = m_playerList.GetItemData(item);
 		if (index < m_players.size()) {
-			targetUID = m_players[index].strUID;  // 서버로 보낼 UID
-			targetName = m_players[index].name;    // 로그 표시용
+			targetUID = m_players[index].strUID;
+			targetName = m_players[index].name;
 		}
 	}
 
@@ -201,19 +195,18 @@ void CNightDlg::OnBnClickedConfirm()
 		return;
 	}
 
-	// 4. 서버 전송 및 디버깅 팝업
 	if (m_pSocket)
 	{
-		// 서버로 UID 전송
 		CStringA strJson;
 		CT2A asciiTarget(targetUID);
+		// JSON 전송용은 CStringA이므로 (LPCSTR) 캐스팅 (기존에 잘 되어 있었음)
 		strJson.Format("{\"op\": \"NIGHT_ACTION\", \"target\": \"%s\"}", (LPCSTR)asciiTarget);
 		m_pSocket->SendJson(strJson);
 	}
 
-	// 5. 로그 및 UI 처리 
 	CString log;
-	log.Format(_T("[시스템] '%s'님에게 능력을 사용했습니다.\r\n"), targetName);
+	// ★ [수정] CString을 넘길 때 (LPCTSTR)로 형변환
+	log.Format(_T("[시스템] '%s'님에게 능력을 사용했습니다.\r\n"), (LPCTSTR)targetName);
 	AppendChat(log);
 
 	m_bActionSubmitted = true;
@@ -231,7 +224,8 @@ void CNightDlg::OnClickedSend()
 	if (msg.IsEmpty()) return;
 
 	CString line;
-	line.Format(_T("[나] %s\r\n"), msg);
+	// ★ [수정] CString을 넘길 때 (LPCTSTR)로 형변환
+	line.Format(_T("[나] %s\r\n"), (LPCTSTR)msg);
 	AppendChat(line);
 	m_chatInput.SetWindowText(_T(""));
 }
@@ -244,7 +238,8 @@ void CNightDlg::OnItemchangedPlayerList(NMHDR* pNMHDR, LRESULT* pResult)
 		if (idx >= 0) {
 			CString strTarget = m_playerList.GetItemText(idx, 0);
 			CString preview;
-			preview.Format(_T("선택 대상: %s"), strTarget);
+			// ★ [수정] CString을 넘길 때 (LPCTSTR)로 형변환
+			preview.Format(_T("선택 대상: %s"), (LPCTSTR)strTarget);
 			m_lblPreview.SetWindowText(preview);
 		}
 	}
@@ -257,6 +252,7 @@ void CNightDlg::OnOK()
 }
 
 
+// --- [핵심] 메시지 수신부 ---
 LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 {
 	CStringA* pJsonA = (CStringA*)wParam;
@@ -268,61 +264,70 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	if (strJson.Find("\"op\": \"NIGHT_RESULT\"") != -1)
 	{
 		CString strVictim = _T("");
-		int nVictimNumber = 0;
 
-		// victim UID 파싱
 		int nVic = strJson.Find("\"victim\": \"");
 		if (nVic != -1) {
 			CStringA sVal = strJson.Mid(nVic + 11);
 			sVal = sVal.Left(sVal.Find('\"'));
-			strVictim = CString(CA2T(sVal)); // 희생자 UID
+			strVictim = CString(CA2T(sVal));
 		}
 
 		bool bSaved = (strJson.Find("\"saved\": true") != -1);
 
-		// 누군가 죽었고, 의사가 못 살렸다면?
 		if (!strVictim.IsEmpty() && !bSaved)
 		{
-			// 1) 내가 죽었는지 확인
-			if (strVictim == m_strMyUID)
-			{
-				KillTimer(1); // 타이머 멈춤
-				AfxMessageBox(_T("마피아에게 습격당해 사망했습니다... 프로그램을 종료합니다."));
-				EndDialog(IDABORT); // ★ 로비로 강제 퇴장
-				return 0;
+			// (1) 내부 리스트 업데이트 (화면 표시용)
+			for (auto& p : m_players) {
+				if (p.strUID == strVictim) {
+					p.alive = false;
+					break;
+				}
 			}
-			else
+			InitPlayerList(); // 리스트 갱신
+
+			// (2) 부모(MainDlg) 데이터 동기화
+			CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
+			if (pMain)
 			{
-				// 2) 다른 사람이 죽었음 -> 내 내부 데이터에서 그 사람을 '사망' 처리
-				for (auto& p : m_players)
-				{
-					if (p.strUID == strVictim) // UID로 비교
-					{
-						p.alive = false;
+				for (auto& roomPlayer : pMain->m_vecRoomPlayers) {
+					if (roomPlayer.strUID == strVictim) {
+						roomPlayer.bIsAlive = false;
 						break;
 					}
 				}
+			}
 
-				// ★ [핵심] 리스트 새로고침! (이제 죽은 사람이 화면 목록에서 사라짐)
-				InitPlayerList();
-
-				// 채팅창 알림
+			// (3) 메시지 출력 및 내 사망 확인
+			if (strVictim == m_strMyUID) {
+				KillTimer(1);
+				AfxMessageBox(_T("마피아에게 습격당해 사망했습니다."));
+				EndDialog(IDABORT);
+				return 0;
+			}
+			else {
 				CString msg;
-				msg.Format(_T("[속보] 플레이어(%s)가 습격당했습니다.\r\n"), strVictim);
+				// ★ [수정] CString을 넘길 때 (LPCTSTR)로 형변환
+				msg.Format(_T("[속보] 플레이어(%s)가 습격당했습니다.\r\n"), (LPCTSTR)strVictim);
 				AppendChat(msg);
 			}
 		}
 		else
 		{
-			// 아무도 안 죽음
 			AppendChat(_T("[속보] 밤 동안 아무도 죽지 않았습니다.\r\n"));
 		}
 	}
-
-	// 2. 낮으로 페이즈 전환 (내가 살았을 때만 실행됨)
+	// ★★★ 게임 종료 신호 처리 ★★★
+	else if (strJson.Find("\"op\": \"GAME_END\"") != -1)
+	{
+		KillTimer(1);
+		AfxMessageBox(_T("게임이 종료되었습니다!"));
+		EndDialog(IDABORT);
+		return 0;
+	}
+	// 3. 낮으로 페이즈 전환
 	else if (strJson.Find("\"phase\": \"DAY\"") != -1)
 	{
-		RequestPhaseChange(false); // 낮 화면으로 이동
+		RequestPhaseChange(false);
 	}
 
 	return 0;
@@ -345,17 +350,8 @@ BOOL CNightDlg::PreTranslateMessage(MSG* pMsg)
 {
 	if (pMsg->message == WM_KEYDOWN)
 	{
-		if (pMsg->wParam == VK_RETURN)
-		{
-			return TRUE; // 엔터키 무시
-		}
-		// ESC키도 막고 싶다면 아래 주석 해제
-		
-		if (pMsg->wParam == VK_ESCAPE)
-		{
-			return TRUE;
-		}
-		
+		if (pMsg->wParam == VK_RETURN) return TRUE;
+		if (pMsg->wParam == VK_ESCAPE) return TRUE;
 	}
 	return CDialogEx::PreTranslateMessage(pMsg);
 }

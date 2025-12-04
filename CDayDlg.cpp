@@ -192,6 +192,8 @@ afx_msg LRESULT CDayDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
+// CDayDlg.cpp 의 ProcessServerMessage 함수 전체를 이것으로 교체하세요.
+
 void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 {
 	if (strJsonA.Find("\"op\": \"CHAT\"") != -1)
@@ -226,26 +228,48 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 		}
 
 		if (!strVictim.IsEmpty()) {
-			if (m_strMyUID == strVictim || m_strMyNickname.Find(strVictim) != -1) {
-				KillTimer(1);
-				AfxMessageBox(_T("투표로 처형되었습니다. 프로그램을 종료합니다."));
-				EndDialog(IDABORT); // 프로그램 종료 신호 전송
-				return;
-			}
-
-			// 다른 사람 죽음 -> 리스트에서 제거
+			// 1. 내부 리스트 업데이트
 			for (auto& p : m_vecDayPlayers) {
 				if (p.strUID == strVictim) {
 					p.bIsAlive = false;
 					break;
 				}
 			}
-			PopulateVoteList(); // 화면 갱신
+			PopulateVoteList();
+
+			// ★★★ 2. 부모(MainDlg) 데이터 동기화 ★★★
+			CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
+			if (pMain) {
+				pMain->m_vecRoomPlayers = m_vecDayPlayers;
+			}
 
 			CString msg;
-			// Player{number} 형식으로 표시
 			msg.Format(_T("[속보] Player%d 님이 처형되었습니다.\r\n"), nVictimNumber);
 			AppendTextToRichEdit(msg, RGB(255, 0, 0));
+
+			// 3. 내가 죽었는지 확인
+			if (m_strMyUID == strVictim || m_strMyNickname.Find(strVictim) != -1) {
+				KillTimer(1);
+
+				// 방장인지 확인 (방장은 죽어도 관전)
+				bool bAmIHost = false;
+				for (const auto& p : m_vecDayPlayers) {
+					if (p.strUID == m_strMyUID && p.bIsHost) {
+						bAmIHost = true; break;
+					}
+				}
+
+				if (bAmIHost) {
+					AfxMessageBox(_T("투표로 처형되었습니다. 방장이므로 관전 모드로 전환합니다."));
+					GetDlgItem(IDC_BUTTON_VOTE)->EnableWindow(FALSE);
+					GetDlgItem(IDC_BUTTON_SEND_CHAT)->EnableWindow(FALSE);
+				}
+				else {
+					AfxMessageBox(_T("투표로 처형되었습니다. 로비로 이동합니다."));
+					EndDialog(IDABORT); // ★ IDABORT: 게임 루프 탈출
+					return;
+				}
+			}
 		}
 		else {
 			AppendTextToRichEdit(_T("[알림] 아무도 처형되지 않았습니다.\r\n"), RGB(0, 100, 0));
@@ -259,10 +283,12 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 		AppendTextToRichEdit(_T("[알림] 밤이 되었습니다.\r\n"), RGB(255, 0, 0));
 		RequestPhaseChange(false);
 	}
+	// ★★★ [핵심] 게임 종료 신호 처리 ★★★
 	else if (strJsonA.Find("\"op\": \"GAME_END\"") != -1) {
 		KillTimer(1);
 		AfxMessageBox(_T("게임이 종료되었습니다!"));
-		OnCancel();
+		// OnCancel 대신 IDABORT를 사용하여 메인 루프를 확실히 깨줍니다.
+		EndDialog(IDABORT);
 	}
 	else if (strJsonA.Find("\"op\": \"ERROR\"") != -1) {
 		AfxMessageBox(CStrA_to_CStr(strJsonA));
