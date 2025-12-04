@@ -707,7 +707,7 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 		dlgNight.m_pSocket = &m_Socket;
 		m_Socket.m_pDlg = &dlgNight;
 
-		INT_PTR nResponse = dlgNight.DoModal();dddd
+		INT_PTR nResponse = dlgNight.DoModal();
 
 		if (nResponse != IDOK) { bGameInProgress = false; break; }
 
