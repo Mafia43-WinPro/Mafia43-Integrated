@@ -29,6 +29,7 @@ public:
 	CString m_strMyUID;     // 서버가 발급한 내 ID
 	CString m_strRoomID;    // 내가 현재 입장한 방 ID
 	CString m_strMyRole;    // 내 직업
+	bool m_bConnected = false;
 	virtual BOOL PreTranslateMessage(MSG* pMsg); // 엔터, ESC 불가
 
 	std::vector<RoomPlayerInfo> m_vecRoomPlayers;
@@ -39,6 +40,8 @@ public:
 	void ParseRoomList(const CStringA& strJsonA);
 	void ParseRoomState(const CStringA& strJsonA);
 	void ParseRole(const CStringA& strJsonA);
+
+	void EnsureRoomListTimer();
 
 	// CStringA (UTF-8) -> CString (TCHAR) 변환 헬퍼
 	CStringA CStr_to_CStrA(const CString& strT);
