@@ -155,8 +155,6 @@ void CNightDlg::OnTimer(UINT_PTR nIDEvent)
 
 void CNightDlg::OnBnClickedConfirm()
 {
-	if (m_bActionSubmitted) return;
-
 	int sel = m_cmbAction.GetCurSel();
 	CString action;
 	if (sel >= 0) m_cmbAction.GetLBText(sel, action);
@@ -188,16 +186,13 @@ void CNightDlg::OnBnClickedConfirm()
 	}
 
 	CString log;
-	log.Format(_T("[시스템] '%s'님에게 능력을 사용했습니다.\r\n"), (LPCTSTR)targetName);
+	log.Format(_T("[시스템] '%s'님을 선택했습니다.\r\n"), (LPCTSTR)targetName);
 	AppendChat(log);
 
 	m_bActionSubmitted = true;
-	m_btnConfirm.EnableWindow(FALSE);
-	m_cmbAction.EnableWindow(FALSE);
-	m_playerList.EnableWindow(FALSE);
+	// 마피아가 투표를 바꿀 수 있도록 버튼 비활성화 주석 처리
+	// m_btnConfirm.EnableWindow(FALSE);
 }
-
-// CNightDlg.cpp 의 OnClickedSend 함수 (보내기 버튼)
 
 void CNightDlg::OnClickedSend()
 {
@@ -206,26 +201,18 @@ void CNightDlg::OnClickedSend()
 	msg.Trim();
 	if (msg.IsEmpty()) return;
 
-	// [수정] 밤에는 마피아만 채팅 가능
-	if (m_strMyRole != _T("마피아"))
-	{
+	if (m_strMyRole != _T("마피아")) {
 		AppendChat(_T("[시스템] 밤에는 대화할 수 없습니다. (마피아 제외)\r\n"));
 		m_chatInput.SetWindowText(_T(""));
 		return;
 	}
 
-	// 1. 서버로 전송
 	if (m_pSocket) {
 		CStringA strJson;
 		CT2A asciiMsg(msg, CP_UTF8);
-		strJson.Format("{\"op\": \"MAFIA_CHAT\", \"text\": \"%s\"}", (LPCSTR)asciiMsg);
+		strJson.Format("{\"op\": \"NIGHT_CHAT\", \"text\": \"%s\"}", (LPCSTR)asciiMsg);
 		m_pSocket->SendJson(strJson);
 	}
-
-	// 2. ★ [수정] 내 화면에 즉시 표시 (이걸 살려야 내가 쓴 글이 바로 보입니다)
-	CString line;
-	line.Format(_T("[나] %s\r\n"), (LPCTSTR)msg);
-	AppendChat(line);
 
 	m_chatInput.SetWindowText(_T(""));
 }
@@ -250,8 +237,6 @@ void CNightDlg::OnOK()
 	RequestPhaseChange(true);
 }
 
-// CNightDlg.cpp 의 OnReceiveMsg 함수 (서버 메시지 수신)
-
 LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 {
 	CStringA* pJsonA = (CStringA*)wParam;
@@ -259,7 +244,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	CStringA strJson = *pJsonA;
 	delete pJsonA;
 
-	// 1. 밤 결과 (사망자 발생)
+	// 1. 밤 결과
 	if (strJson.Find("\"op\": \"NIGHT_RESULT\"") != -1)
 	{
 		CString strVictim = _T("");
@@ -274,19 +259,13 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 
 		if (!strVictim.IsEmpty() && !bSaved)
 		{
-			// 리스트 갱신
-			for (auto& p : m_players) {
-				if (p.strUID == strVictim) { p.alive = false; break; }
-			}
+			for (auto& p : m_players) { if (p.strUID == strVictim) { p.alive = false; break; } }
 			InitPlayerList();
 
-			// 부모 데이터 동기화
 			CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
 			if (pMain) {
 				for (auto& roomPlayer : pMain->m_vecRoomPlayers) {
-					if (roomPlayer.strUID == strVictim) {
-						roomPlayer.bIsAlive = false; break;
-					}
+					if (roomPlayer.strUID == strVictim) { roomPlayer.bIsAlive = false; break; }
 				}
 			}
 
@@ -306,7 +285,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 			AppendChat(_T("[속보] 밤 동안 아무도 죽지 않았습니다.\r\n"));
 		}
 	}
-	// 2. 경찰 조사 결과
+	// 2. 경찰 결과
 	else if (strJson.Find("\"op\": \"COP_RESULT\"") != -1)
 	{
 		bool bIsMafia = (strJson.Find("\"is_mafia\": true") != -1);
@@ -316,55 +295,41 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 		AfxMessageBox(msg);
 		AppendChat(msg + _T("\r\n"));
 	}
-	// 3. ★★★ [문제 2번 해결] 채팅 수신 (MAFIA_CHAT) ★★★
+	// 3. 채팅
 	else if (strJson.Find("\"op\": \"CHAT\"") != -1 || strJson.Find("\"op\": \"MAFIA_CHAT\"") != -1)
 	{
-		// 1) 텍스트 파싱
 		CString text = _T("");
 		int nText = strJson.Find("\"text\": \"");
 		if (nText != -1) {
-			CStringA sText = strJson.Mid(nText + 9); // "text": " 길이
+			CStringA sText = strJson.Mid(nText + 9);
 			int nEnd = sText.Find('\"');
 			if (nEnd != -1) sText = sText.Left(nEnd);
 			text = CString(CA2T(sText, CP_UTF8));
 		}
 
-		// 2) 보낸 사람 이름 파싱 (서버 코드는 "from"을 보냄)
-		CString sender = _T("Unknown");
-		int nName = strJson.Find("\"from\": \""); // 서버 코드 기준
-		if (nName != -1) {
-			CStringA sName = strJson.Mid(nName + 9); // "from": " 길이
-			int nEndName = sName.Find('\"');
-			if (nEndName != -1) sName = sName.Left(nEndName);
-			sender = CString(CA2T(sName, CP_UTF8));
-		}
-		else {
-			// 혹시 모를 호환성을 위해 from_name도 체크
-			nName = strJson.Find("\"from_name\": \"");
-			if (nName != -1) {
-				CStringA sName = strJson.Mid(nName + 14);
-				int nEndName = sName.Find('\"');
-				if (nEndName != -1) sName = sName.Left(nEndName);
-				sender = CString(CA2T(sName, CP_UTF8));
+		// 플레이어 번호 추출
+		int playerNum = 0;
+		int nNum = strJson.Find("\"from_number\":");
+		if (nNum != -1) {
+			CStringA sNum = strJson.Mid(nNum + 14);
+			sNum.Trim();
+			int nComma = sNum.Find(',');
+			int nBrace = sNum.Find('}');
+			int nEnd = (nComma != -1 && (nBrace == -1 || nComma < nBrace)) ? nComma : nBrace;
+			if (nEnd != -1) {
+				sNum = sNum.Left(nEnd);
+				playerNum = atoi(sNum);
 			}
 		}
 
-		// 내 메시지가 다시 돌아온 경우(서버 에코), 내가 이미 OnClickedSend에서 띄웠으므로 무시
-		// (단, 닉네임이 같아야 함. 닉네임이 다르면 보여줌)
-		/*
-		if (sender == m_strMyNickname) {
-			return 0;
-		}
-		*/
-
-			// 내가 보낸 메시지가 다시 돌아온 경우(서버 정책에 따라 다름) 중복 표시 방지 로직을 넣을 수도 있으나,
-			// 일단 다 표시하는 것이 안전함.
-			CString msg;
-			msg.Format(_T("%s: %s\r\n"), (LPCTSTR)sender, (LPCTSTR)CString(CA2T(sText, CP_UTF8)));
-			AppendChat(msg);
-		}
-	}ㅇㅇ
-	// 4. 게임 종료
+		CString msg;
+		if (playerNum > 0)
+			msg.Format(_T("Player%d: %s\r\n"), playerNum, (LPCTSTR)text);
+		else
+			msg.Format(_T("Unknown: %s\r\n"), (LPCTSTR)text);
+		AppendChat(msg);
+	}
+	// 4. 종료
 	else if (strJson.Find("\"op\": \"GAME_END\"") != -1)
 	{
 		KillTimer(1);
@@ -372,7 +337,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 		EndDialog(IDABORT);
 		return 0;
 	}
-	// 5. 다음 페이즈(낮) 이동
+	// 5. 다음 페이즈
 	else if (strJson.Find("\"phase\": \"DAY\"") != -1)
 	{
 		RequestPhaseChange(false);
@@ -380,6 +345,22 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 
 	return 0;
 }
+
+// UI 핸들러들
+void CNightDlg::OnSysCommand(UINT nID, LPARAM lParam) { CDialogEx::OnSysCommand(nID, lParam); }
+void CNightDlg::OnPaint() {
+	if (IsIconic()) {
+		CPaintDC dc(this); SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
+		int cxIcon = GetSystemMetrics(SM_CXICON); int cyIcon = GetSystemMetrics(SM_CYICON);
+		CRect rect; GetClientRect(&rect);
+		int x = (rect.Width() - cxIcon + 1) / 2; int y = (rect.Height() - cyIcon + 1) / 2;
+		dc.DrawIcon(x, y, m_hIcon);
+	}
+	else CDialogEx::OnPaint();
+}
+HCURSOR CNightDlg::OnQueryDragIcon() { return static_cast<HCURSOR>(m_hIcon); }
+void CNightDlg::OnEnChangeReChatview() {}
+void CNightDlg::OnBnClickedButton2() {}
 
 void CNightDlg::RequestPhaseChange(bool bNotifyServer)
 {
@@ -402,19 +383,3 @@ BOOL CNightDlg::PreTranslateMessage(MSG* pMsg)
 	}
 	return CDialogEx::PreTranslateMessage(pMsg);
 }
-
-// UI 핸들러들
-void CNightDlg::OnSysCommand(UINT nID, LPARAM lParam) { CDialogEx::OnSysCommand(nID, lParam); }
-void CNightDlg::OnPaint() {
-	if (IsIconic()) {
-		CPaintDC dc(this); SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
-		int cxIcon = GetSystemMetrics(SM_CXICON); int cyIcon = GetSystemMetrics(SM_CYICON);
-		CRect rect; GetClientRect(&rect);
-		int x = (rect.Width() - cxIcon + 1) / 2; int y = (rect.Height() - cyIcon + 1) / 2;
-		dc.DrawIcon(x, y, m_hIcon);
-	}
-	else CDialogEx::OnPaint();
-}
-HCURSOR CNightDlg::OnQueryDragIcon() { return static_cast<HCURSOR>(m_hIcon); }
-void CNightDlg::OnEnChangeReChatview() {}
-void CNightDlg::OnBnClickedButton2() {}
