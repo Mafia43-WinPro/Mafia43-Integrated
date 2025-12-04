@@ -772,6 +772,25 @@ void CMafia43Dlg::OnTimer(UINT_PTR nIDEvent)
 	CDialogEx::OnTimer(nIDEvent);
 }
 
+BOOL CMafia43Dlg::PreTranslateMessage(MSG* pMsg)
+{
+	if (pMsg->message == WM_KEYDOWN)
+	{
+		if (pMsg->wParam == VK_RETURN)
+		{
+			return TRUE; // 엔터키 무시
+		}
+		// ESC키도 막고 싶다면 아래 주석 해제
+		/*
+		if (pMsg->wParam == VK_ESCAPE)
+		{
+			return TRUE;
+		}
+		*/
+	}
+	return CDialogEx::PreTranslateMessage(pMsg);
+}
+
 CStringA CMafia43Dlg::CStr_to_CStrA(const CString& strT)
 {
 	CT2A utf8(strT, CP_UTF8);

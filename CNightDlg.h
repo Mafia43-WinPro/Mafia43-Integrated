@@ -13,7 +13,7 @@ public:
 	// 생성자
 	CNightDlg(const std::vector<PlayerInfo>& players, CWnd* pParent = nullptr);
 	virtual ~CNightDlg();
-
+	virtual BOOL PreTranslateMessage(MSG* pMsg); // 엔터, ESC 불가
 	// 소켓 설정 함수
 	void SetSocket(CClientSocket* pSocket) { m_pSocket = pSocket; }
 	bool m_bActionSubmitted;

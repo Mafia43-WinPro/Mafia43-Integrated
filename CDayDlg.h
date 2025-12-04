@@ -19,7 +19,7 @@ public:
 		const std::vector<RoomPlayerInfo>& players = std::vector<RoomPlayerInfo>()); // RoomPlayerInfo를 전달받음
 
 	virtual ~CDayDlg();
-
+	virtual BOOL PreTranslateMessage(MSG* pMsg); // 엔터, ESC 불가
 	// 대화 상자 데이터입니다.
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_DAY }; // IDD_DAY (그대로 유지)
