@@ -74,8 +74,11 @@ public:
 	std::vector<PlayerInfo> m_players;
 	int m_selectedTargetId = 0;
 	int m_timeLeftSec = 0;
+	bool m_bNextPhaseRequested = false;
+
 
 	// 헬퍼 함수
 	void InitPlayerList();
 	void AppendChat(CString strMsg);
+	void RequestPhaseChange(bool bNotifyServer);
 };
