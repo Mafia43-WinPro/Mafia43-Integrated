@@ -63,12 +63,28 @@ BOOL CDayDlg::OnInitDialog()
 	SetDlgItemText(IDC_STATIC, strRoleDisplay);
 
 	// 죽었는지 확인
+	bool bAmIAlive = true;
+	bool bAmIHost = false;
+
+	// 내 상태와 방장 여부 먼저 파악
 	for (const auto& p : m_vecDayPlayers) {
-		if (p.strUID == m_strMyUID && !p.bIsAlive) {
-			// ▼▼▼ [수정] ▼▼▼
-			AfxMessageBox(_T("사망 상태입니다. 프로그램을 종료합니다."));
-			EndDialog(IDABORT); // 로비 이동(OnCancel) 대신 프로그램 종료 신호(IDABORT) 전송
-			// ▲▲▲
+		if (p.strUID == m_strMyUID) {
+			bAmIAlive = p.bIsAlive;
+			bAmIHost = p.bIsHost;
+			break;
+		}
+	}
+
+	if (!bAmIAlive) {
+		if (bAmIHost) {
+			AfxMessageBox(_T("당신은 사망했습니다. 하지만 방장이므로 관전 모드로 진행합니다."));
+			GetDlgItem(IDC_BUTTON_VOTE)->EnableWindow(FALSE);
+			GetDlgItem(IDC_BUTTON_SEND_CHAT)->EnableWindow(FALSE);
+			AppendTextToRichEdit(_T("[알림] 관전 모드입니다. (방장 권한 유지)\r\n"), RGB(128, 128, 128));
+		}
+		else {
+			AfxMessageBox(_T("사망 상태입니다. 로비로 이동합니다."));
+			EndDialog(IDABORT);
 			return TRUE;
 		}
 	}
@@ -121,7 +137,6 @@ void CDayDlg::OnTimer(UINT_PTR nIDEvent)
 					break;
 				}
 			}
-
 			RequestPhaseChange(true);
 		}
 	}
@@ -167,7 +182,6 @@ void CDayDlg::OnBnClickedButtonVote()
 
 	if (strTargetUID == m_strMyUID) { AfxMessageBox(_T("자신에게 투표할 수 없습니다.")); return; }
 
-	// 죽은 플레이어에게 투표 방지
 	if (strTargetStatus == _T("사망")) {
 		AfxMessageBox(_T("사망한 플레이어에게 투표할 수 없습니다."));
 		return;
@@ -192,8 +206,6 @@ afx_msg LRESULT CDayDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-// CDayDlg.cpp 의 ProcessServerMessage 함수 전체를 이것으로 교체하세요.
-
 void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 {
 	if (strJsonA.Find("\"op\": \"CHAT\"") != -1)
@@ -213,7 +225,6 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 			strVictim = CString(CA2T(sVal));
 		}
 
-		// victim_number 파싱
 		int nVicNum = strJsonA.Find("\"victim_number\"");
 		if (nVicNum != -1) {
 			int c = strJsonA.Find(':', nVicNum);
@@ -237,7 +248,8 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 			}
 			PopulateVoteList();
 
-			// ★★★ 2. 부모(MainDlg) 데이터 동기화 ★★★
+			// ★★★ 2. [문제해결] 부모(MainDlg) 데이터 즉시 동기화 ★★★
+			// 이 코드가 있어야 다음 밤(Night)이 생성될 때 죽은 사람이 제대로 반영됩니다.
 			CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
 			if (pMain) {
 				pMain->m_vecRoomPlayers = m_vecDayPlayers;
@@ -251,7 +263,6 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 			if (m_strMyUID == strVictim || m_strMyNickname.Find(strVictim) != -1) {
 				KillTimer(1);
 
-				// 방장인지 확인 (방장은 죽어도 관전)
 				bool bAmIHost = false;
 				for (const auto& p : m_vecDayPlayers) {
 					if (p.strUID == m_strMyUID && p.bIsHost) {
@@ -266,7 +277,7 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 				}
 				else {
 					AfxMessageBox(_T("투표로 처형되었습니다. 로비로 이동합니다."));
-					EndDialog(IDABORT); // ★ IDABORT: 게임 루프 탈출
+					EndDialog(IDABORT);
 					return;
 				}
 			}
@@ -283,11 +294,9 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 		AppendTextToRichEdit(_T("[알림] 밤이 되었습니다.\r\n"), RGB(255, 0, 0));
 		RequestPhaseChange(false);
 	}
-	// ★★★ [핵심] 게임 종료 신호 처리 ★★★
 	else if (strJsonA.Find("\"op\": \"GAME_END\"") != -1) {
 		KillTimer(1);
 		AfxMessageBox(_T("게임이 종료되었습니다!"));
-		// OnCancel 대신 IDABORT를 사용하여 메인 루프를 확실히 깨줍니다.
 		EndDialog(IDABORT);
 	}
 	else if (strJsonA.Find("\"op\": \"ERROR\"") != -1) {
@@ -297,7 +306,6 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 
 void CDayDlg::ParseChat(const CStringA& strJsonA)
 {
-	// from_number 필드 파싱
 	int nFromNumber = 0;
 	int nFromNumPos = strJsonA.Find("\"from_number\"");
 	if (nFromNumPos != -1) {
@@ -345,13 +353,9 @@ void CDayDlg::ParseChat(const CStringA& strJsonA)
 			senderLabel = CStrA_to_CStr(strFromName);
 
 		if (senderLabel.IsEmpty() && nFromNumber > 0)
-		{
 			senderLabel.Format(_T("Player%d"), nFromNumber);
-		}
 		else if (senderLabel.IsEmpty() && !strFromUID.IsEmpty())
-		{
 			senderLabel = CStrA_to_CStr(strFromUID);
-		}
 
 		CString msg;
 		msg.Format(_T("%s: %s"), senderLabel.IsEmpty() ? _T("Player") : senderLabel, (LPCTSTR)CStrA_to_CStr(sText));
@@ -359,42 +363,28 @@ void CDayDlg::ParseChat(const CStringA& strJsonA)
 	}
 }
 
-// CDayDlg.cpp
-
 void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 {
 	m_vecDayPlayers.clear();
 
-	// 1. players 배열이 시작되는 위치를 찾거나, 그냥 전체에서 검색
-	// (간단하게 전체 문자열을 순회하며 { } 객체를 찾습니다)
 	int nSearchPos = strJsonA.Find("\"players\"");
 	if (nSearchPos == -1) nSearchPos = 0;
 
 	while (true)
 	{
-		// 2. 객체의 시작({)과 끝(})을 찾음
 		int nObjStart = strJsonA.Find('{', nSearchPos);
-		if (nObjStart == -1) break; // 더 이상 객체가 없음
-
+		if (nObjStart == -1) break;
 		int nObjEnd = strJsonA.Find('}', nObjStart);
-		if (nObjEnd == -1) break; // 닫는 괄호가 없으면 종료
+		if (nObjEnd == -1) break;
 
-		// 3. 플레이어 한 명분의 데이터 추출
 		CStringA strPlayerObj = strJsonA.Mid(nObjStart, nObjEnd - nObjStart + 1);
-
-		// 다음 검색 위치를 현재 객체 뒤로 이동
 		nSearchPos = nObjEnd + 1;
 
-		// ★★★ [핵심] 작성해두신 안전한 헬퍼 함수를 사용합니다 ★★★
-		// 이 함수는 공백, 줄바꿈을 다 제거하고 값을 뽑아주므로 아주 안전합니다.
 		CStringA strUid = ExtractJsonStringField(strPlayerObj, "uid");
 		CStringA strName = ExtractJsonStringField(strPlayerObj, "name");
 
-		// UID가 없으면 유효하지 않은 데이터이므로 건너뜀
 		if (strUid.IsEmpty()) continue;
 
-		// 4. 생존 여부 및 방장 여부 확인 (간단 파싱)
-		// 공백 제거된 버전으로 검사
 		CStringA strCleanObj = strPlayerObj;
 		strCleanObj.Replace(" ", "");
 		strCleanObj.Replace("\t", "");
@@ -404,16 +394,13 @@ void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 		bool bAlive = (strCleanObj.Find("\"alive\":true") != -1);
 		bool bIsHost = (strCleanObj.Find("\"is_host\":true") != -1);
 
-		// 5. 플레이어 번호 추출
 		int nPlayerNumber = 0;
 		int kNumber = strCleanObj.Find("\"number\":");
 		if (kNumber != -1) {
-			// "number":123,... 형태 파싱
-			CStringA sNum = strCleanObj.Mid(kNumber + 9); // "number": 길이만큼 이동
+			CStringA sNum = strCleanObj.Mid(kNumber + 9);
 			nPlayerNumber = atoi(sNum);
 		}
 
-		// 번호가 없으면 이름에서 파싱 (Player 1 형태)
 		if (nPlayerNumber == 0) {
 			CString tempName = CStrA_to_CStr(strName);
 			int pPos = tempName.Find(_T("Player"));
@@ -422,9 +409,8 @@ void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 			}
 		}
 
-		// 6. 데이터 저장
 		RoomPlayerInfo player;
-		player.strUID = CStrA_to_CStr(strUid); // Extract함수가 이미 Trim된 값을 줌
+		player.strUID = CStrA_to_CStr(strUid);
 		player.strName = CStrA_to_CStr(strName);
 		player.nPlayerNumber = nPlayerNumber;
 		player.bIsAlive = bAlive;
@@ -433,13 +419,11 @@ void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 		m_vecDayPlayers.push_back(player);
 	}
 
-	// ★★★ [필수] 부모 창(메인)의 데이터 갱신 ★★★
 	CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
 	if (pMain)
 	{
 		pMain->m_vecRoomPlayers = m_vecDayPlayers;
 	}
-
 	PopulateVoteList();
 }
 
@@ -473,31 +457,19 @@ CStringA CDayDlg::ExtractJsonStringField(const CStringA& json, const CStringA& f
 
 const RoomPlayerInfo* CDayDlg::FindPlayerByUID(const CString& uid) const
 {
-	for (const auto& player : m_vecDayPlayers)
-	{
-		if (player.strUID == uid)
-			return &player;
-	}
+	for (const auto& player : m_vecDayPlayers) { if (player.strUID == uid) return &player; }
 	return nullptr;
 }
 
 const RoomPlayerInfo* CDayDlg::FindPlayerByNumber(int number) const
 {
-	for (const auto& player : m_vecDayPlayers)
-	{
-		if (player.nPlayerNumber == number)
-			return &player;
-	}
+	for (const auto& player : m_vecDayPlayers) { if (player.nPlayerNumber == number) return &player; }
 	return nullptr;
 }
 
 const RoomPlayerInfo* CDayDlg::FindPlayerByName(const CString& name) const
 {
-	for (const auto& player : m_vecDayPlayers)
-	{
-		if (player.strName == name)
-			return &player;
-	}
+	for (const auto& player : m_vecDayPlayers) { if (player.strName == name) return &player; }
 	return nullptr;
 }
 
@@ -508,8 +480,7 @@ void CDayDlg::OnOK()
 
 void CDayDlg::RequestPhaseChange(bool bNotifyServer)
 {
-	if (m_bNextPhaseRequested)
-		return;
+	if (m_bNextPhaseRequested) return;
 
 	m_bNextPhaseRequested = true;
 
@@ -518,8 +489,7 @@ void CDayDlg::RequestPhaseChange(bool bNotifyServer)
 		bool bAmIHost = false;
 		for (const auto& p : m_vecDayPlayers) {
 			if (p.strUID == m_strMyUID && p.bIsHost) {
-				bAmIHost = true;
-				break;
+				bAmIHost = true; break;
 			}
 		}
 
@@ -534,17 +504,8 @@ BOOL CDayDlg::PreTranslateMessage(MSG* pMsg)
 {
 	if (pMsg->message == WM_KEYDOWN)
 	{
-		if (pMsg->wParam == VK_RETURN)
-		{
-			return TRUE; // 엔터키 무시
-		}
-		// ESC키도 막고 싶다면 아래 주석 해제
-		
-		if (pMsg->wParam == VK_ESCAPE)
-		{
-			return TRUE;
-		}
-		
+		if (pMsg->wParam == VK_RETURN) return TRUE;
+		if (pMsg->wParam == VK_ESCAPE) return TRUE;
 	}
 	return CDialogEx::PreTranslateMessage(pMsg);
 }
