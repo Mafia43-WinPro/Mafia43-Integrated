@@ -225,7 +225,7 @@ void CMafia43Dlg::OnClickedButtonConnect()
 
 	// [주의] 서버 컴퓨터의 IP 주소를 입력해야 합니다. (로컬 테스트 시 127.0.0.1)
 	// 기존에 입력하신 IP: 10.21.32.245
-	if (!m_Socket.Connect(_T("127.0.0.1"), 5566))
+	if (!m_Socket.Connect(_T("10.21.36.44"), 5566))
 	{
 		if (GetLastError() != WSAEWOULDBLOCK)
 		{

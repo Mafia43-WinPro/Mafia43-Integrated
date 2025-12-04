@@ -171,18 +171,23 @@ void CNightDlg::OnTimer(UINT_PTR nIDEvent)
 	CDialogEx::OnTimer(nIDEvent);
 }
 
+// CNightDlg.cpp
+
 void CNightDlg::OnBnClickedConfirm()
 {
 	if (m_bActionSubmitted) return;
 
+	// 1. 선택한 행동 가져오기
 	int sel = m_cmbAction.GetCurSel();
 	CString action;
 	if (sel >= 0) m_cmbAction.GetLBText(sel, action);
 	else action = _T("NONE");
 
+	// 2. 리스트에서 선택한 대상 확인
 	int item = m_playerList.GetNextItem(-1, LVNI_SELECTED);
 	CString targetUID = _T("");
 	CString targetName = _T("");
+	CString targetUID = _T(""); //  보낼 ID
 
 	// 리스트에서 선택한 항목의 인덱스를 가져와서 UID 찾기
 	if (item != -1) {
@@ -198,6 +203,7 @@ void CNightDlg::OnBnClickedConfirm()
 		return;
 	}
 
+	// 4. 서버 전송 및 디버깅 팝업
 	if (m_pSocket)
 	{
 		// 서버로 UID 전송
@@ -207,6 +213,7 @@ void CNightDlg::OnBnClickedConfirm()
 		m_pSocket->SendJson(strJson);
 	}
 
+	// 5. 로그 및 UI 처리 
 	CString log;
 	log.Format(_T("[시스템] '%s'님에게 능력을 사용했습니다.\r\n"), targetName);
 	AppendChat(log);
@@ -272,7 +279,8 @@ void CNightDlg::OnOK()
 	CDialogEx::OnOK();
 }
 
-// ★ [핵심] 서버 메시지 수신 (결과 확인)
+// CNightDlg.cpp 안의 OnReceiveMsg 함수
+
 LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 {
 	CStringA* pJsonA = (CStringA*)wParam;
@@ -280,7 +288,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	CStringA strJson = *pJsonA;
 	delete pJsonA;
 
-	// 1. 밤 결과 확인
+	// 1. 밤 결과 확인 (누가 죽었나?)
 	if (strJson.Find("\"op\": \"NIGHT_RESULT\"") != -1)
 	{
 		CString strVictim = _T("");
@@ -322,11 +330,13 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 			AppendChat(msg);
 		}
 	}
-	// 2. 낮으로 페이즈 전환
+
+	// 2. 낮으로 이동
 	else if (strJson.Find("\"phase\": \"DAY\"") != -1)
 	{
 		OnOK(); // 낮 화면으로 이동
 	}
+
 	return 0;
 }
 
