@@ -5,7 +5,8 @@
 #include "Mafia43.h"
 #include "Mafia43Dlg.h"
 #include "afxdialogex.h"
-#include "CRoleAssignDlg.h" 
+#include "SharedStructures.h"
+#include "CRoleAssignDlg.h"
 #include "CNightDlg.h"
 #include "CDayDlg.h"
 
@@ -450,11 +451,11 @@ void CMafia43Dlg::ParseRoomList(const CStringA& strJsonA)
 		const char* pStateEnd = strstr(pState + 10, "\"");
 		if (!pStateEnd) { pRoom = nullptr; continue; }
 
-		CStringA strId(pRoom + 7, pIdEnd - (pRoom + 7));
-		CStringA strTitle(pTitle + 10, pTitleEnd - (pTitle + 10));
-		CStringA strCur(pCur + 7, pCurEnd - (pCur + 7));
-		CStringA strMax(pMax + 7, pMaxEnd - (pMax + 7));
-		CStringA strState(pState + 10, pStateEnd - (pState + 10));
+		CStringA strId(pRoom + 7, static_cast<int>(pIdEnd - (pRoom + 7)));
+		CStringA strTitle(pTitle + 10, static_cast<int>(pTitleEnd - (pTitle + 10)));
+		CStringA strCur(pCur + 7, static_cast<int>(pCurEnd - (pCur + 7)));
+		CStringA strMax(pMax + 7, static_cast<int>(pMaxEnd - (pMax + 7)));
+		CStringA strState(pState + 10, static_cast<int>(pStateEnd - (pState + 10)));
 
 		CString strCurMax;
 		strCurMax.Format(_T("%s/%s"), (LPCTSTR)CStrA_to_CStr(strCur), (LPCTSTR)CStrA_to_CStr(strMax));

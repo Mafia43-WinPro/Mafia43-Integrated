@@ -3,6 +3,7 @@
 #include "Mafia43.h"
 #include "CDayDlg.h"
 #include "afxdialogex.h"
+#include "SharedStructures.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

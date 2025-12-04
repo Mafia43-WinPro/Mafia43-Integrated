@@ -5,6 +5,7 @@
 #include "CNightDlg.h"     // 밤 화면 헤더
 #include "afxdialogex.h"
 #include "resource.h"
+#include "SharedStructures.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

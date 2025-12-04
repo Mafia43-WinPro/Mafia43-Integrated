@@ -2,13 +2,7 @@
 #include "afxdialogex.h"
 #include "CClientSocket.h" // 서버 통신용 헤더
 #include <vector>
-
-// 플레이어 정보 구조체
-struct PlayerInfo {
-	int id;
-	CString name;
-	bool alive;
-};
+#include "SharedStructures.h" // 공유 구조체 정의
 
 // CNightDlg 대화 상자
 class CNightDlg : public CDialogEx

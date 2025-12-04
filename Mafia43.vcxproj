@@ -192,6 +192,7 @@
     <ClInclude Include="Mafia43Dlg.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="SharedStructures.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>

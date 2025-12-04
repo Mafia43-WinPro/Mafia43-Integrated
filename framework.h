@@ -13,7 +13,8 @@
 
 #include <afxwin.h>         // MFC 핵심 및 표준 구성 요소입니다.
 #include <afxext.h>         // MFC 확장입니다.
-
+#include <afxsock.h>        // MFC 소켓 확장입니다.
+#include <afxrich.h>        // MFC 리치 에디트 컨트롤 지원입니다.
 
 #include <afxdisp.h>        // MFC 자동화 클래스입니다.
 
