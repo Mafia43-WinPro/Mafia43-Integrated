@@ -197,7 +197,7 @@ void CNightDlg::OnBnClickedConfirm()
 	m_playerList.EnableWindow(FALSE);
 }
 
-// CNightDlg.cpp
+// CNightDlg.cpp 의 OnClickedSend 함수 (보내기 버튼)
 
 void CNightDlg::OnClickedSend()
 {
@@ -218,19 +218,14 @@ void CNightDlg::OnClickedSend()
 	if (m_pSocket) {
 		CStringA strJson;
 		CT2A asciiMsg(msg, CP_UTF8);
-
-		// [수정] 서버 프로토콜에 맞춰 'MAFIA_CHAT'으로 변경
 		strJson.Format("{\"op\": \"MAFIA_CHAT\", \"text\": \"%s\"}", (LPCSTR)asciiMsg);
 		m_pSocket->SendJson(strJson);
 	}
 
-	// 2. 내 화면에 즉시 표시 (서버가 나에게도 다시 보내주지만, 즉각적인 반응을 위해)
-	// 중복 표시가 싫다면 이 부분을 주석 처리하고 서버 응답만 기다려도 됩니다.
-	/*
+	// 2. ★ [수정] 내 화면에 즉시 표시 (이걸 살려야 내가 쓴 글이 바로 보입니다)
 	CString line;
 	line.Format(_T("[나] %s\r\n"), (LPCTSTR)msg);
 	AppendChat(line);
-	*/
 
 	m_chatInput.SetWindowText(_T(""));
 }
@@ -255,7 +250,7 @@ void CNightDlg::OnOK()
 	RequestPhaseChange(true);
 }
 
-// CNightDlg.cpp
+// CNightDlg.cpp 의 OnReceiveMsg 함수 (서버 메시지 수신)
 
 LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 {
@@ -270,11 +265,9 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 		CString strVictim = _T("");
 		int nVic = strJson.Find("\"victim\": \"");
 		if (nVic != -1) {
-			CStringA sVal = strJson.Mid(nVic + 11); // "victim": " 길이만큼 이동
-			// [주의] 값 뒤에 콤마(,)나 닫는 중괄호(})가 올 수 있음. 따옴표 기준으로 자름.
+			CStringA sVal = strJson.Mid(nVic + 11);
 			int nEnd = sVal.Find('\"');
 			if (nEnd != -1) sVal = sVal.Left(nEnd);
-
 			strVictim = CString(CA2T(sVal));
 		}
 		bool bSaved = (strJson.Find("\"saved\": true") != -1);
@@ -287,7 +280,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 			}
 			InitPlayerList();
 
-			// 부모(MafiaDlg) 데이터 동기화
+			// 부모 데이터 동기화
 			CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
 			if (pMain) {
 				for (auto& roomPlayer : pMain->m_vecRoomPlayers) {
@@ -320,40 +313,54 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 		CString msg;
 		if (bIsMafia) msg = _T("조사 결과: 해당 플레이어는 [마피아] 입니다.");
 		else msg = _T("조사 결과: 해당 플레이어는 [마피아]가 아닙니다.");
-
 		AfxMessageBox(msg);
 		AppendChat(msg + _T("\r\n"));
 	}
-	// 3. 채팅 수신 (MAFIA_CHAT 추가)
-	// [수정] 서버가 보내주는 op는 "MAFIA_CHAT" 입니다.
+	// 3. ★★★ [문제 2번 해결] 채팅 수신 (MAFIA_CHAT) ★★★
 	else if (strJson.Find("\"op\": \"CHAT\"") != -1 || strJson.Find("\"op\": \"MAFIA_CHAT\"") != -1)
 	{
+		// 1) 텍스트 파싱
+		CString text = _T("");
 		int nText = strJson.Find("\"text\": \"");
 		if (nText != -1) {
-			CStringA sText = strJson.Mid(nText + 9);
+			CStringA sText = strJson.Mid(nText + 9); // "text": " 길이
 			int nEnd = sText.Find('\"');
 			if (nEnd != -1) sText = sText.Left(nEnd);
+			text = CString(CA2T(sText, CP_UTF8));
+		}
 
-			// [수정] 서버 키 이름은 "from" 입니다. ("from_name" 아님)
-			CString sender = _T("Unknown");
-			int nName = strJson.Find("\"from\": \"");
+		// 2) 보낸 사람 이름 파싱 (서버 코드는 "from"을 보냄)
+		CString sender = _T("Unknown");
+		int nName = strJson.Find("\"from\": \""); // 서버 코드 기준
+		if (nName != -1) {
+			CStringA sName = strJson.Mid(nName + 9); // "from": " 길이
+			int nEndName = sName.Find('\"');
+			if (nEndName != -1) sName = sName.Left(nEndName);
+			sender = CString(CA2T(sName, CP_UTF8));
+		}
+		else {
+			// 혹시 모를 호환성을 위해 from_name도 체크
+			nName = strJson.Find("\"from_name\": \"");
 			if (nName != -1) {
-				CStringA sName = strJson.Mid(nName + 9); // "from": " 길이
+				CStringA sName = strJson.Mid(nName + 14);
 				int nEndName = sName.Find('\"');
 				if (nEndName != -1) sName = sName.Left(nEndName);
 				sender = CString(CA2T(sName, CP_UTF8));
 			}
-
-			// 플레이어 번호도 있다면 파싱 (선택사항)
-			int nNumPos = strJson.Find("\"from_number\":");
-			if (nNumPos != -1) {
-				// (번호 파싱 로직 생략 가능, 이름만 보여줘도 됨)
-			}
-
-			CString msg;
-			msg.Format(_T("%s: %s\r\n"), (LPCTSTR)sender, (LPCTSTR)CString(CA2T(sText, CP_UTF8)));
-			AppendChat(msg);
 		}
+
+		// 내 메시지가 다시 돌아온 경우(서버 에코), 내가 이미 OnClickedSend에서 띄웠으므로 무시
+		// (단, 닉네임이 같아야 함. 닉네임이 다르면 보여줌)
+		/*
+		if (sender == m_strMyNickname) {
+			return 0;
+		}
+		*/
+
+		// 메시지 표시
+		CString msg;
+		msg.Format(_T("%s: %s\r\n"), (LPCTSTR)sender, (LPCTSTR)text);
+		AppendChat(msg);
 	}
 	// 4. 게임 종료
 	else if (strJson.Find("\"op\": \"GAME_END\"") != -1)
