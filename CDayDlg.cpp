@@ -344,12 +344,42 @@ void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 			if (s != -1 && e != -1) strName = strPlayerObj.Mid(s + 1, e - s - 1);
 		}
 
+		// Player Number 추출
+		int nPlayerNumber = 0;
+
+		// 방법 1: "number" 필드에서 추출
+		int kNumber = strPlayerObj.Find("\"number\"");
+		if (kNumber != -1) {
+			int c = strPlayerObj.Find(':', kNumber);
+			CStringA numStr = strPlayerObj.Mid(c + 1);
+			numStr.Trim();
+			int endPos = numStr.FindOneOf(",}");
+			if (endPos != -1) {
+				numStr = numStr.Left(endPos);
+				numStr.Trim();
+				nPlayerNumber = atoi(numStr);
+			}
+		}
+
+		// 방법 2: "number" 필드가 없으면 "name"에서 "Player X" 형식 파싱
+		if (nPlayerNumber == 0 && !strName.IsEmpty()) {
+			int playerPos = strName.Find("Player");
+			if (playerPos != -1) {
+				CStringA numPart = strName.Mid(playerPos + 6); // "Player" 다음부터
+				numPart.Trim();
+				if (!numPart.IsEmpty()) {
+					nPlayerNumber = atoi(numPart);
+				}
+			}
+		}
+
 		bool bAlive = (strCleanObj.Find("\"alive\":true") != -1);
 		bool bIsHost = (strCleanObj.Find("\"is_host\":true") != -1);
 
 		RoomPlayerInfo player;
 		player.strUID = CStrA_to_CStr(strUid);
 		player.strName = CStrA_to_CStr(strName);
+		player.nPlayerNumber = nPlayerNumber;  // 플레이어 번호 저장
 		player.bIsAlive = bAlive;
 		player.bIsHost = bIsHost;
 
