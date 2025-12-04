@@ -206,19 +206,31 @@ void CNightDlg::OnClickedSend()
 	msg.Trim();
 	if (msg.IsEmpty()) return;
 
-	// 1. 서버로 전송 (마피아끼리 보임)
+	// [수정] 밤에는 마피아만 채팅 가능
+	if (m_strMyRole != _T("마피아"))
+	{
+		AppendChat(_T("[시스템] 밤에는 대화할 수 없습니다. (마피아 제외)\r\n"));
+		m_chatInput.SetWindowText(_T(""));
+		return;
+	}
+
+	// 1. 서버로 전송
 	if (m_pSocket) {
 		CStringA strJson;
 		CT2A asciiMsg(msg, CP_UTF8);
-		// NIGHT_CHAT으로 보내야 서버가 마피아들에게 뿌려줌
-		strJson.Format("{\"op\": \"NIGHT_CHAT\", \"text\": \"%s\"}", (LPCSTR)asciiMsg);
+
+		// [수정] 서버 프로토콜에 맞춰 'MAFIA_CHAT'으로 변경
+		strJson.Format("{\"op\": \"MAFIA_CHAT\", \"text\": \"%s\"}", (LPCSTR)asciiMsg);
 		m_pSocket->SendJson(strJson);
 	}
 
-	// 2. ★ [수정] 내 화면에 즉시 표시 (이게 없어서 채팅 안되는 것처럼 보였음)
+	// 2. 내 화면에 즉시 표시 (서버가 나에게도 다시 보내주지만, 즉각적인 반응을 위해)
+	// 중복 표시가 싫다면 이 부분을 주석 처리하고 서버 응답만 기다려도 됩니다.
+	/*
 	CString line;
 	line.Format(_T("[나] %s\r\n"), (LPCTSTR)msg);
 	AppendChat(line);
+	*/
 
 	m_chatInput.SetWindowText(_T(""));
 }
@@ -258,8 +270,11 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 		CString strVictim = _T("");
 		int nVic = strJson.Find("\"victim\": \"");
 		if (nVic != -1) {
-			CStringA sVal = strJson.Mid(nVic + 11);
-			sVal = sVal.Left(sVal.Find('\"'));
+			CStringA sVal = strJson.Mid(nVic + 11); // "victim": " 길이만큼 이동
+			// [주의] 값 뒤에 콤마(,)나 닫는 중괄호(})가 올 수 있음. 따옴표 기준으로 자름.
+			int nEnd = sVal.Find('\"');
+			if (nEnd != -1) sVal = sVal.Left(nEnd);
+
 			strVictim = CString(CA2T(sVal));
 		}
 		bool bSaved = (strJson.Find("\"saved\": true") != -1);
@@ -272,7 +287,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 			}
 			InitPlayerList();
 
-			// 부모 데이터 동기화
+			// 부모(MafiaDlg) 데이터 동기화
 			CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
 			if (pMain) {
 				for (auto& roomPlayer : pMain->m_vecRoomPlayers) {
@@ -309,26 +324,32 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 		AfxMessageBox(msg);
 		AppendChat(msg + _T("\r\n"));
 	}
-	// 3. 채팅 수신 (마피아끼리 대화 포함)
-	// 서버가 NIGHT_CHAT을 CHAT으로 바꿔서 보내줄 수도 있고 그대로 보낼 수도 있으므로 둘 다 체크
-	else if (strJson.Find("\"op\": \"CHAT\"") != -1 || strJson.Find("\"op\": \"NIGHT_CHAT\"") != -1)
+	// 3. 채팅 수신 (MAFIA_CHAT 추가)
+	// [수정] 서버가 보내주는 op는 "MAFIA_CHAT" 입니다.
+	else if (strJson.Find("\"op\": \"CHAT\"") != -1 || strJson.Find("\"op\": \"MAFIA_CHAT\"") != -1)
 	{
 		int nText = strJson.Find("\"text\": \"");
 		if (nText != -1) {
 			CStringA sText = strJson.Mid(nText + 9);
-			sText = sText.Left(sText.Find('\"'));
+			int nEnd = sText.Find('\"');
+			if (nEnd != -1) sText = sText.Left(nEnd);
 
-			// 보낸 사람 이름 파싱 (없으면 Player)
-			CString sender = _T("Player");
-			int nName = strJson.Find("\"from_name\": \"");
+			// [수정] 서버 키 이름은 "from" 입니다. ("from_name" 아님)
+			CString sender = _T("Unknown");
+			int nName = strJson.Find("\"from\": \"");
 			if (nName != -1) {
-				CStringA sName = strJson.Mid(nName + 14);
-				sName = sName.Left(sName.Find('\"'));
+				CStringA sName = strJson.Mid(nName + 9); // "from": " 길이
+				int nEndName = sName.Find('\"');
+				if (nEndName != -1) sName = sName.Left(nEndName);
 				sender = CString(CA2T(sName, CP_UTF8));
 			}
 
-			// 내가 보낸 메시지가 다시 돌아온 경우(서버 정책에 따라 다름) 중복 표시 방지 로직을 넣을 수도 있으나,
-			// 일단 다 표시하는 것이 안전함.
+			// 플레이어 번호도 있다면 파싱 (선택사항)
+			int nNumPos = strJson.Find("\"from_number\":");
+			if (nNumPos != -1) {
+				// (번호 파싱 로직 생략 가능, 이름만 보여줘도 됨)
+			}
+
 			CString msg;
 			msg.Format(_T("%s: %s\r\n"), (LPCTSTR)sender, (LPCTSTR)CString(CA2T(sText, CP_UTF8)));
 			AppendChat(msg);
