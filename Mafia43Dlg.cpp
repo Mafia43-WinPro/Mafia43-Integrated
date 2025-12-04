@@ -1,4 +1,4 @@
-﻿// Mafia43Dlg.cpp: 구현 파일
+// Mafia43Dlg.cpp: 구현 파일
 
 #include "pch.h"
 #include "framework.h"
@@ -162,10 +162,16 @@ BOOL CMafia43Dlg::OnInitDialog()
 	GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(FALSE);
 
 	m_staticRoomInfo.SetWindowText(_T("서버에 접속하세요."));
-	SetTimer(2U, 2000, NULL); // [추가] 2초마다 타이머 2번 실행
+	EnsureRoomListTimer();
 	return TRUE;
 }
 
+void CMafia43Dlg::EnsureRoomListTimer()
+{
+	// 로비에서 방 목록을 주기적으로 요청하기 위한 타이머를 보장한다.
+	// 이미 설정되어 있어도 동일한 ID로 다시 설정하면 주기가 갱신된다.
+	SetTimer(2U, 2000, NULL);
+}
 void CMafia43Dlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
 	if ((nID & 0xFFF0) == IDM_ABOUTBOX)
@@ -297,12 +303,15 @@ void CMafia43Dlg::OnClickedButtonExit()
 LRESULT CMafia43Dlg::OnConnectSuccess(WPARAM wParam, LPARAM lParam)
 {
 	m_staticRoomInfo.SetWindowText(_T("서버 접속 성공."));
+	m_bConnected = true;
+	EnsureRoomListTimer();
 	return 0;
 }
 
 LRESULT CMafia43Dlg::OnConnectFail(WPARAM wParam, LPARAM lParam)
 {
 	m_staticRoomInfo.SetWindowText(_T("서버 연결 실패."));
+	m_bConnected = false;
 	GetDlgItem(IDC_BUTTON_START)->EnableWindow(TRUE);
 	return 0;
 }
@@ -310,6 +319,8 @@ LRESULT CMafia43Dlg::OnConnectFail(WPARAM wParam, LPARAM lParam)
 LRESULT CMafia43Dlg::OnServerClose(WPARAM wParam, LPARAM lParam)
 {
 	m_staticRoomInfo.SetWindowText(_T("서버 연결 끊김. 재접속하세요."));
+	m_bConnected = false;
+	m_strRoomID.Empty();
 	GetDlgItem(IDC_BUTTON_START)->EnableWindow(TRUE);
 	GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(FALSE);
 	GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(FALSE);
@@ -635,7 +646,15 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 
 		nItem++;
 		nSearchPos = nObjEnd + 1;
-	}
+		}
+
+		// 방 상태를 받은 직후에도 최신 로비 정보를 요청하여
+		// 방 안에 있을 때도 로비의 방/인원 수가 계속 갱신되도록 한다.
+		if (m_bConnected)
+		{
+			m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
+		}
+
 }
 
 void CMafia43Dlg::ParseRole(const CStringA& strJsonA)
@@ -772,8 +791,8 @@ void CMafia43Dlg::OnTimer(UINT_PTR nIDEvent)
 	// [추가] 2번 타이머: 로비에 있을 때 방 목록 자동 갱신
 	if (nIDEvent == 2U)
 	{
-		// 방에 들어가 있지 않을 때만 요청 (방 안에서는 ROOM_STATE가 오니까 필요 없음)
-		if (m_strRoomID.IsEmpty())
+		// 로비/방 구분 없이 주기적으로 방 목록을 갱신한다.
+		if (m_bConnected)
 		{
 			m_Socket.SendJson("{\"op\":\"LIST_ROOMS\"}");
 		}
