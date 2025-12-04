@@ -54,10 +54,10 @@ BEGIN
     "\r\n"
     "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_KOR)\r\n"
     "LANGUAGE 18, 1\r\n"
-    "#include ""res\\Mafia43.rc2""  // Microsoft Visual C++ 이외의 다른 도구에서 편집한 리소스입니다.\r\n"
-    "#include ""l.KOR\\afxres.rc""      // 표준 구성 요소\r\n"
+    "#include ""res\\Mafia43.rc2""  // Microsoft Visual C++ ?댁쇅???ㅻⅨ ?꾧뎄?먯꽌 ?몄쭛??由ъ냼?ㅼ엯?덈떎.\r\n"
+    "#include ""l.KOR\\afxres.rc""      // ?쒖? 援ъ꽦 ?붿냼\r\n"
     "#if !defined(_AFXDLL)\r\n"
-    "#include ""l.KOR\\afxribbon.rc""   // MFC 리본 및 컨트롤 막대 리소스\r\n"
+    "#include ""l.KOR\\afxribbon.rc""   // MFC 由щ낯 諛?而⑦듃濡?留됰? 由ъ냼??\n"
     "#endif\r\n"
     "#endif\r\n"
     "\0"
@@ -98,7 +98,7 @@ EXSTYLE WS_EX_APPWINDOW
 FONT 9, "MS Shell Dlg", 0, 0, 0x1
 BEGIN
     CONTROL         IDB_BACKGROUND_MAIN,IDC_PIC_BACKGROUND,"Static",SS_BITMAP,0,0,192,244
-    CONTROL         "",IDC_LIST_PLAYERS_IN_ROOM,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,96,7,97,50
+    CONTROL         "",IDC_LIST_PLAYERS_IN_ROOM,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,7,186,50
     EDITTEXT        IDC_EDIT_ROOM_TITLE,49,220,40,14,ES_AUTOHSCROLL
     PUSHBUTTON      "서버 접속",IDC_BUTTON_START,97,219,39,14
     PUSHBUTTON      "나가기",IDC_BUTTON_EXIT,148,219,39,14
@@ -107,10 +107,10 @@ BEGIN
     PUSHBUTTON      "방 입장",IDC_BTN_JOIN_ROOM,94,168,50,14
     PUSHBUTTON      "게임 시작",IDC_BTN_START_GAME,93,139,50,14
     EDITTEXT        IDC_EDIT_NICKNAME,7,220,40,14,ES_AUTOHSCROLL | ES_READONLY
-    CONTROL         "",IDC_LIST_PLAYERS,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,63,179,52
+    CONTROL         "",IDC_LIST_PLAYERS,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,63,186,52
 END
 
-IDD_ROLE_ASSIGN DIALOGEX 0, 0, 684, 390
+IDD_ROLE_ASSIGN DIALOGEX 0, 0, 685, 390
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
 CAPTION "역할 확인"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -127,13 +127,12 @@ CAPTION "Dialog"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "",IDC_LIST_PLAYERS,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,26,70,103
-    COMBOBOX        IDC_CMB_ACTION,7,142,48,30,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
-    PUSHBUTTON      "확인",IDC_BTN_CONFIRM,81,83,50,14
-    PUSHBUTTON      "스킵",IDC_BTN_SKIP,133,82,50,14
+    COMBOBOX        IDC_CMB_ACTION,90,44,81,30,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "확인",IDC_BTN_CONFIRM,104,114,50,14
     PUSHBUTTON      "전송",IDC_BTN_SEND,243,156,50,14
     LTEXT           "역할: ...",IDC_LBL_ROLE,7,14,68,8
     LTEXT           "남은 시간",IDC_LBL_TIMER,196,7,107,8
-    LTEXT           "선택: ...",IDC_LBL_PREVIEW,7,132,68,8
+    LTEXT           "선택: ...",IDC_LBL_PREVIEW,91,26,68,8
     CONTROL         "",IDC_RE_CHATVIEW,"RichEdit20W",ES_MULTILINE | ES_AUTOHSCROLL | ES_READONLY | WS_BORDER | WS_TABSTOP,194,23,100,106
     EDITTEXT        IDC_EDT_CHAT,195,132,98,24,ES_AUTOHSCROLL
 END
@@ -149,7 +148,7 @@ BEGIN
     PUSHBUTTON      "투표하기",IDC_BUTTON_VOTE,19,143,42,12
     LTEXT           "역할:",IDC_STATIC,19,7,70,8
     LTEXT           "남은 시간: 00:00",IDC_STATIC_TIME,186,7,99,8
-    CONTROL         "",IDC_RICH_CHAT,"RichEdit20W",ES_MULTILINE | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP,186,24,102,101
+    CONTROL         "",IDC_RICH_CHAT,"RichEdit20W",WS_BORDER | WS_TABSTOP | 0x84,186,24,102,101
 END
 
 
@@ -219,7 +218,7 @@ BEGIN
     IDD_ROLE_ASSIGN, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 322
+        RIGHTMARGIN, 323
         TOPMARGIN, 7
         BOTTOMMARGIN, 203
         HORZGUIDE, 154
@@ -313,10 +312,10 @@ END
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_KOR)
 LANGUAGE 18, 1
-#include "res\Mafia43.rc2"  // Microsoft Visual C++ 이외의 다른 도구에서 편집한 리소스입니다.
-#include "l.KOR\afxres.rc"      // 표준 구성 요소
+#include "res\Mafia43.rc2"  // Microsoft Visual C++ ?댁쇅???ㅻⅨ ?꾧뎄?먯꽌 ?몄쭛??由ъ냼?ㅼ엯?덈떎.
+#include "l.KOR\afxres.rc"      // ?쒖? 援ъ꽦 ?붿냼
 #if !defined(_AFXDLL)
-#include "l.KOR\afxribbon.rc"   // MFC 리본 및 컨트롤 막대 리소스
+#include "l.KOR\afxribbon.rc"   // MFC 由щ낯 諛?而⑦듃濡?留됰? 由ъ냼??
 #endif
 #endif
 
