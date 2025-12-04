@@ -17,6 +17,7 @@ public:
 	// 소켓 설정 함수
 	void SetSocket(CClientSocket* pSocket) { m_pSocket = pSocket; }
 	bool m_bActionSubmitted;
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
 
 	// 대화 상자 데이터입니다.
 #ifdef AFX_DESIGN_TIME

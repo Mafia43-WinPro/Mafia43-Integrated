@@ -20,6 +20,8 @@ public:
 
 	virtual ~CDayDlg();
 
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
+
 	// 대화 상자 데이터입니다.
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_DAY }; // IDD_DAY (그대로 유지)
