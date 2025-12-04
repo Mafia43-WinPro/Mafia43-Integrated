@@ -781,12 +781,12 @@ BOOL CMafia43Dlg::PreTranslateMessage(MSG* pMsg)
 			return TRUE; // 엔터키 무시
 		}
 		// ESC키도 막고 싶다면 아래 주석 해제
-		/*
+		
 		if (pMsg->wParam == VK_ESCAPE)
 		{
 			return TRUE;
 		}
-		*/
+		
 	}
 	return CDialogEx::PreTranslateMessage(pMsg);
 }
