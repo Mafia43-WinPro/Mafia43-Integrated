@@ -197,7 +197,8 @@ void CNightDlg::OnBnClickedConfirm()
 	m_playerList.EnableWindow(FALSE);
 }
 
-// ★★★ [문제해결] 채팅 송신 로직 추가 ★★★
+// CNightDlg.cpp
+
 void CNightDlg::OnClickedSend()
 {
 	CString msg;
@@ -205,22 +206,19 @@ void CNightDlg::OnClickedSend()
 	msg.Trim();
 	if (msg.IsEmpty()) return;
 
-	// 1. 서버로 전송 (이 코드가 없어서 채팅이 안 갔음)
+	// 1. 서버로 전송 (마피아끼리 보임)
 	if (m_pSocket) {
 		CStringA strJson;
 		CT2A asciiMsg(msg, CP_UTF8);
-		// op는 NIGHT_CHAT으로 전송 (서버 규약에 따라 CHAT일 수도 있음)
+		// NIGHT_CHAT으로 보내야 서버가 마피아들에게 뿌려줌
 		strJson.Format("{\"op\": \"NIGHT_CHAT\", \"text\": \"%s\"}", (LPCSTR)asciiMsg);
 		m_pSocket->SendJson(strJson);
 	}
 
-	// 2. 내 화면엔 바로 표시하지 않음 (서버가 뿌려주는걸 받아야 함)
-	// 만약 내 채팅을 내가 바로 보고 싶다면 아래 주석 해제
-	/*
+	// 2. ★ [수정] 내 화면에 즉시 표시 (이게 없어서 채팅 안되는 것처럼 보였음)
 	CString line;
 	line.Format(_T("[나] %s\r\n"), (LPCTSTR)msg);
 	AppendChat(line);
-	*/
 
 	m_chatInput.SetWindowText(_T(""));
 }
@@ -245,6 +243,8 @@ void CNightDlg::OnOK()
 	RequestPhaseChange(true);
 }
 
+// CNightDlg.cpp
+
 LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 {
 	CStringA* pJsonA = (CStringA*)wParam;
@@ -252,7 +252,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	CStringA strJson = *pJsonA;
 	delete pJsonA;
 
-	// 1. 밤 결과 확인
+	// 1. 밤 결과 (사망자 발생)
 	if (strJson.Find("\"op\": \"NIGHT_RESULT\"") != -1)
 	{
 		CString strVictim = _T("");
@@ -266,18 +266,18 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 
 		if (!strVictim.IsEmpty() && !bSaved)
 		{
+			// 리스트 갱신
 			for (auto& p : m_players) {
 				if (p.strUID == strVictim) { p.alive = false; break; }
 			}
 			InitPlayerList();
 
+			// 부모 데이터 동기화
 			CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
-			if (pMain)
-			{
+			if (pMain) {
 				for (auto& roomPlayer : pMain->m_vecRoomPlayers) {
 					if (roomPlayer.strUID == strVictim) {
-						roomPlayer.bIsAlive = false;
-						break;
+						roomPlayer.bIsAlive = false; break;
 					}
 				}
 			}
@@ -298,31 +298,28 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 			AppendChat(_T("[속보] 밤 동안 아무도 죽지 않았습니다.\r\n"));
 		}
 	}
-	// ★★★ [문제해결] 경찰 조사 결과 처리 ★★★
+	// 2. 경찰 조사 결과
 	else if (strJson.Find("\"op\": \"COP_RESULT\"") != -1)
 	{
-		// JSON 예: {"op": "COP_RESULT", "is_mafia": true, "target": "..."}
 		bool bIsMafia = (strJson.Find("\"is_mafia\": true") != -1);
-
 		CString msg;
 		if (bIsMafia) msg = _T("조사 결과: 해당 플레이어는 [마피아] 입니다.");
 		else msg = _T("조사 결과: 해당 플레이어는 [마피아]가 아닙니다.");
 
-		AfxMessageBox(msg); // 팝업으로 알림
-		AppendChat(msg + _T("\r\n")); // 채팅창에도 기록
+		AfxMessageBox(msg);
+		AppendChat(msg + _T("\r\n"));
 	}
-	// ★★★ [문제해결] 밤 채팅 수신 처리 ★★★
+	// 3. 채팅 수신 (마피아끼리 대화 포함)
+	// 서버가 NIGHT_CHAT을 CHAT으로 바꿔서 보내줄 수도 있고 그대로 보낼 수도 있으므로 둘 다 체크
 	else if (strJson.Find("\"op\": \"CHAT\"") != -1 || strJson.Find("\"op\": \"NIGHT_CHAT\"") != -1)
 	{
-		// 텍스트 파싱
 		int nText = strJson.Find("\"text\": \"");
 		if (nText != -1) {
 			CStringA sText = strJson.Mid(nText + 9);
 			sText = sText.Left(sText.Find('\"'));
 
-			CString sender = _T("Player"); // 기본값
-
-			// 보낸 사람 이름 파싱 (선택 사항)
+			// 보낸 사람 이름 파싱 (없으면 Player)
+			CString sender = _T("Player");
 			int nName = strJson.Find("\"from_name\": \"");
 			if (nName != -1) {
 				CStringA sName = strJson.Mid(nName + 14);
@@ -330,11 +327,14 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 				sender = CString(CA2T(sName, CP_UTF8));
 			}
 
+			// 내가 보낸 메시지가 다시 돌아온 경우(서버 정책에 따라 다름) 중복 표시 방지 로직을 넣을 수도 있으나,
+			// 일단 다 표시하는 것이 안전함.
 			CString msg;
 			msg.Format(_T("%s: %s\r\n"), (LPCTSTR)sender, (LPCTSTR)CString(CA2T(sText, CP_UTF8)));
 			AppendChat(msg);
 		}
 	}
+	// 4. 게임 종료
 	else if (strJson.Find("\"op\": \"GAME_END\"") != -1)
 	{
 		KillTimer(1);
@@ -342,6 +342,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 		EndDialog(IDABORT);
 		return 0;
 	}
+	// 5. 다음 페이즈(낮) 이동
 	else if (strJson.Find("\"phase\": \"DAY\"") != -1)
 	{
 		RequestPhaseChange(false);

@@ -674,6 +674,8 @@ void CMafia43Dlg::ParseRole(const CStringA& strJsonA)
 }
 
 
+// CMafia43Dlg.cpp
+
 LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 {
 	if (m_strMyRole.IsEmpty())
@@ -692,74 +694,61 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 	bool bGameInProgress = true;
 	while (bGameInProgress)
 	{
-		// --- 밤 페이즈 ---
+		// ---------------------------------------------------------
+		// [밤 페이즈 시작]
+		// ---------------------------------------------------------
 
-		// [추가] CNightDlg에 전달할 플레이어 목록 생성
+		// 1. 현재(최신) 생존자 목록을 바탕으로 밤 화면용 데이터 생성
 		std::vector<PlayerInfo> nightPlayers;
 		for (const auto& roomPlayer : m_vecRoomPlayers)
 		{
-			// [핵심] 살아있는 플레이어만 목록에 포함
+			// 살아있는 사람만 밤 화면 리스트에 추가
 			if (roomPlayer.bIsAlive)
 			{
 				PlayerInfo nightPlayer;
-				// CNightDlg의 PlayerInfo 구조체에 맞춰 데이터 변환
-				nightPlayer.id = roomPlayer.nPlayerNumber;  // 서버 플레이어 번호 사용
+				nightPlayer.id = roomPlayer.nPlayerNumber;
 				nightPlayer.nPlayerNumber = roomPlayer.nPlayerNumber;
-				nightPlayer.strUID = roomPlayer.strUID;  // UID 저장 (서버로 보낼 때 사용)
+				nightPlayer.strUID = roomPlayer.strUID;
 
-				// Player{number} 형식으로 이름 생성
 				CString strDisplayName;
 				strDisplayName.Format(_T("Player%d"), roomPlayer.nPlayerNumber);
 				nightPlayer.name = strDisplayName;
-				nightPlayer.alive = roomPlayer.bIsAlive;
+				nightPlayer.alive = true;
 				nightPlayers.push_back(nightPlayer);
 			}
-
-			
 		}
 
-		// [수정] CNightDlg를 새로운 생성자(nightPlayers)로 인스턴스화
+		// 2. 밤 다이얼로그 실행
 		CNightDlg dlgNight(nightPlayers, this);
 
-		// [수정] 소켓 및 역할 설정 (기존 로직 유지)
 		dlgNight.m_strMyNickname = m_strNickname;
 		dlgNight.m_strMyRole = m_strMyRole;
 		dlgNight.m_strMyUID = m_strMyUID;
 		dlgNight.m_pSocket = &m_Socket;
-		m_Socket.m_pDlg = &dlgNight;
+		m_Socket.m_pDlg = &dlgNight; // 소켓 메시지를 밤 다이얼로그로 연결
 
 		INT_PTR nResponse = dlgNight.DoModal();
 
-		if (nResponse == IDABORT)
-		{
-			PostQuitMessage(0); // 프로그램 완전 종료 요청
-			return 0;           // 함수 탈출
-		}
-
+		if (nResponse == IDABORT) { bGameInProgress = false; break; } // 죽거나 종료됨
 		if (nResponse != IDOK) { bGameInProgress = false; break; }
 
-		CDayDlg dlgDay(this, &m_Socket, m_strMyUID, m_strNickname, m_strMyRole, m_vecRoomPlayers);
 
-		/*
-		// --- 낮 페이즈 ---
-		CDayDlg dlgDay;
-		dlgDay.m_pSocket = &m_Socket;
-		dlgDay.m_strMyUID = m_strMyUID;
-		dlgDay.m_strMyNickname = m_strNickname;
-		dlgDay.m_strMyRole = m_strMyRole;
-		*/
-		m_Socket.m_pDlg = &dlgDay; // 소켓 연결 대상 변경
+		// ---------------------------------------------------------
+		// [낮 페이즈 시작]
+		// ---------------------------------------------------------
+
+		// 3. 낮 다이얼로그 실행
+		// (현재 m_vecRoomPlayers 정보를 생성자로 넘김)
+		CDayDlg dlgDay(this, &m_Socket, m_strMyUID, m_strNickname, m_strMyRole, m_vecRoomPlayers);
+		m_Socket.m_pDlg = &dlgDay; // 소켓 메시지를 낮 다이얼로그로 연결
 
 		nResponse = dlgDay.DoModal();
 
-		// ▼▼▼ [추가] 낮에 죽어서 IDABORT가 반환되면 프로그램 종료 ▼▼▼
-		if (nResponse == IDABORT)
-		{
-			PostQuitMessage(0); // 프로그램 완전 종료 요청
-			return 0;           // 함수 탈출
-		}
-		// ▲▲▲
+		// ★★★ [핵심 수정] 낮이 끝나고 나오면, 낮 동안 변경된 정보(누가 죽었는지)를 메인 데이터에 덮어쓴다. ★★★
+		// 이 코드가 없으면 다음 밤에 죽은 사람이 되살아납니다.
+		m_vecRoomPlayers = dlgDay.m_vecDayPlayers;
 
+		if (nResponse == IDABORT) { bGameInProgress = false; break; }
 		if (nResponse != IDOK) { bGameInProgress = false; break; }
 	}
 
@@ -769,7 +758,7 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 
 	m_strMyRole = _T("");
 	m_strRoomID = _T("");
-	m_staticRoomInfo.SetWindowText(_T("게임 종료."));
+	m_staticRoomInfo.SetWindowText(_T("게임 종료 / 로비 복귀"));
 
 	GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
 	GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);
