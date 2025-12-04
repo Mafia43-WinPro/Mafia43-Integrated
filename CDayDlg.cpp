@@ -59,7 +59,7 @@ BOOL CDayDlg::OnInitDialog()
 	strRoleDisplay.Format(_T("역할: %s"), (LPCTSTR)m_strMyRole);
 	SetDlgItemText(IDC_STATIC, strRoleDisplay);
 
-	// 1. 방금 밤에 죽었는지 확인 (입장 컷)
+	// 죽었는지 확인
 	for (const auto& p : m_vecDayPlayers) {
 		if (p.strUID == m_strMyUID && !p.bIsAlive) {
 			AfxMessageBox(_T("마피아에게 습격당해 사망했습니다... 로비로 이동합니다."));
@@ -68,15 +68,12 @@ BOOL CDayDlg::OnInitDialog()
 		}
 	}
 
-	// 2. 초기 리스트 그리기
 	PopulateVoteList();
 	AppendTextToRichEdit(_T("[알림] 낮이 되었습니다. 토론을 시작하세요.\r\n"), RGB(0, 0, 255));
 
-	// ★★★ [핵심] 서버에게 "최신 명단 줘!" 라고 요청 ★★★
-	// 이걸 해야 밤 사이에 죽은 사람이 반영된 리스트를 다시 받습니다.
+	// 최신 정보 요청
 	m_pSocket->SendJson("{\"op\":\"ROOM_STATE\"}");
 
-	// 3. 타이머 시작
 	UpdateTimerDisplay();
 	SetTimer(1, 1000, NULL);
 
@@ -89,7 +86,6 @@ void CDayDlg::PopulateVoteList()
 	int nItem = 0;
 	for (const auto& player : m_vecDayPlayers)
 	{
-		// ★ 살아있는 사람만 리스트에 추가 (죽은 사람은 여기서 걸러짐)
 		if (player.bIsAlive)
 		{
 			m_listVote.InsertItem(nItem, player.strUID);
@@ -112,7 +108,7 @@ void CDayDlg::OnTimer(UINT_PTR nIDEvent)
 			AppendTextToRichEdit(_T("[알림] 토론 시간이 종료되었습니다. 투표 집계 중...\r\n"), RGB(255, 0, 0));
 			GetDlgItem(IDC_BUTTON_VOTE)->EnableWindow(FALSE);
 
-			// 시간이 끝나면 방장이 서버에 신호를 보냄
+			// 방장이 다음 단계 요청
 			bool bAmIHost = false;
 			for (const auto& p : m_vecDayPlayers) {
 				if (p.strUID == m_strMyUID && p.bIsHost) {
@@ -187,7 +183,10 @@ afx_msg LRESULT CDayDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 
 void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 {
-	if (strJsonA.Find("\"op\": \"CHAT\"") != -1) ParseChat(strJsonA);
+	if (strJsonA.Find("\"op\": \"CHAT\"") != -1)
+	{
+		ParseChat(strJsonA);
+	}
 	else if (strJsonA.Find("\"op\": \"DAY_RESULT\"") != -1)
 	{
 		CString strVictim = _T("");
@@ -205,6 +204,16 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 				OnCancel();
 				return;
 			}
+
+			// 다른 사람 죽음 -> 리스트에서 제거
+			for (auto& p : m_vecDayPlayers) {
+				if (p.strUID == strVictim) {
+					p.bIsAlive = false;
+					break;
+				}
+			}
+			PopulateVoteList(); // 화면 갱신
+
 			CString msg;
 			msg.Format(_T("[속보] %s 님이 처형되었습니다.\r\n"), (LPCTSTR)strVictim);
 			AppendTextToRichEdit(msg, RGB(255, 0, 0));
@@ -213,20 +222,8 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 			AppendTextToRichEdit(_T("[알림] 아무도 처형되지 않았습니다.\r\n"), RGB(0, 100, 0));
 		}
 	}
-	// ★ [핵심] 서버가 보내준 최신 명단(ROOM_STATE) 처리
 	else if (strJsonA.Find("\"op\": \"ROOM_STATE\"") != -1) {
 		ParseRoomState(strJsonA);
-		// (여기서 리스트가 갱신되어 죽은 사람은 화면에서 사라짐)
-
-		// 혹시 내가 죽은 걸로 바뀌었는지 한 번 더 확인
-		for (const auto& p : m_vecDayPlayers) {
-			if (p.strUID == m_strMyUID && !p.bIsAlive) {
-				KillTimer(1);
-				AfxMessageBox(_T("당신은 사망했습니다. 로비로 이동합니다."));
-				OnCancel();
-				return;
-			}
-		}
 	}
 	else if (strJsonA.Find("\"phase\": \"NIGHT\"") != -1) {
 		KillTimer(1);
@@ -257,7 +254,6 @@ void CDayDlg::ParseChat(const CStringA& strJsonA)
 	}
 }
 
-// ★ [수정] 최신 정보를 받아 리스트를 갱신하는 함수
 void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 {
 	m_vecDayPlayers.clear();
@@ -272,14 +268,12 @@ void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 
 		CStringA strPlayerObj(pPlayer, pObjEnd - pPlayer + 1);
 
-		// 공백 제거 (파싱 안전장치)
 		CStringA strCleanObj = strPlayerObj;
 		strCleanObj.Replace(" ", "");
 		strCleanObj.Replace("\t", "");
 		strCleanObj.Replace("\r", "");
 		strCleanObj.Replace("\n", "");
 
-		// 데이터 추출
 		CStringA strUid = "";
 		int kUid = strPlayerObj.Find("\"uid\"");
 		if (kUid != -1) {
@@ -312,14 +306,12 @@ void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 		pPlayer = strstr(pObjEnd, "\"uid\": \"");
 	}
 
-	// [중요] 메인 화면에도 업데이트 (다음 밤을 위해)
 	CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
 	if (pMain)
 	{
 		pMain->m_vecRoomPlayers = m_vecDayPlayers;
 	}
 
-	// ★ [중요] 화면 새로고침
 	PopulateVoteList();
 }
 

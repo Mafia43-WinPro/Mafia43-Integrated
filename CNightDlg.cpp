@@ -286,7 +286,6 @@ void CNightDlg::OnOK()
 	CDialogEx::OnOK();
 }
 
-// CNightDlg.cpp 안의 OnReceiveMsg 함수
 
 LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 {
@@ -303,33 +302,50 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 		if (nVic != -1) {
 			CStringA sVal = strJson.Mid(nVic + 11);
 			sVal = sVal.Left(sVal.Find('\"'));
-			strVictim = CString(CA2T(sVal)); // 죽은 사람 UID
+			strVictim = CString(CA2T(sVal)); // 희생자 UID
 		}
 		bool bSaved = (strJson.Find("\"saved\": true") != -1);
 
-		// ★ [핵심] 죽은 사람이 나(UID)라면? -> 로비로 강퇴
+		// 누군가 죽었고, 의사가 못 살렸다면?
 		if (!strVictim.IsEmpty() && !bSaved)
 		{
-			// 내 UID를 가져올 방법이 없으므로, 닉네임에 포함되어 있는지 등으로 체크
-			// (안전을 위해 낮 화면 진입 시 한 번 더 체크하지만, 여기서 나가면 더 빠름)
-			if (m_strMyNickname.Find(strVictim) != -1)
+			// 1) 내가 죽었는지 확인
+			if (strVictim == m_strMyUID)
 			{
-				KillTimer(1);
-				AfxMessageBox(_T("마피아에게 습격당해 사망했습니다. 로비로 돌아갑니다."));
-				EndDialog(IDCANCEL); // ★ IDCANCEL을 리턴하면 게임 루프가 깨지고 로비로 감
+				KillTimer(1); // 타이머 멈춤
+				AfxMessageBox(_T("마피아에게 습격당해 사망했습니다... 로비로 돌아갑니다."));
+				EndDialog(IDCANCEL); // ★ 로비로 강제 퇴장
 				return 0;
 			}
 			else
 			{
-				// 다른 사람이 죽음
+				// 2) 다른 사람이 죽었음 -> 내 내부 데이터에서 그 사람을 '사망' 처리
+				for (auto& p : m_players)
+				{
+					if (p.uid == strVictim) // UID로 비교
+					{
+						p.alive = false;
+						break;
+					}
+				}
+
+				// ★ [핵심] 리스트 새로고침! (이제 죽은 사람이 화면 목록에서 사라짐)
+				InitPlayerList();
+
+				// 채팅창 알림
 				CString msg;
-				msg.Format(_T("[속보] %s 님이 습격당했습니다.\r\n"), strVictim);
+				msg.Format(_T("[속보] 플레이어(%s)가 습격당했습니다.\r\n"), strVictim);
 				AppendChat(msg);
 			}
 		}
+		else
+		{
+			// 아무도 안 죽음
+			AppendChat(_T("[속보] 밤 동안 아무도 죽지 않았습니다.\r\n"));
+		}
 	}
 
-	// 2. 낮으로 이동
+	// 2. 낮으로 페이즈 전환 (내가 살았을 때만 실행됨)
 	else if (strJson.Find("\"phase\": \"DAY\"") != -1)
 	{
 		OnOK(); // 낮 화면으로 이동

@@ -65,6 +65,7 @@ public:
 	CClientSocket* m_pSocket;  // 서버 소켓
 	CString m_strMyNickname;
 	CString m_strMyRole;
+	CString m_strMyUID;
 
 	// --- [UI 컨트롤 변수] ---
 	CListCtrl m_playerList;      // IDC_LIST_PLAYERS

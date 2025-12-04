@@ -221,7 +221,7 @@ void CMafia43Dlg::OnClickedButtonConnect()
 			return;
 		}
 	}
-
+	
 	// [주의] 서버 컴퓨터의 IP 주소를 입력해야 합니다. (로컬 테스트 시 127.0.0.1)
 	// 기존에 입력하신 IP: 10.21.32.245
 	if (!m_Socket.Connect(_T("10.21.36.44"), 5566))
@@ -667,6 +667,7 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 		// [수정] 소켓 및 역할 설정 (기존 로직 유지)
 		dlgNight.m_strMyNickname = m_strNickname;
 		dlgNight.m_strMyRole = m_strMyRole;
+		dlgNight.m_strMyUID = m_strMyUID;
 		dlgNight.m_pSocket = &m_Socket;
 		m_Socket.m_pDlg = &dlgNight;
 
