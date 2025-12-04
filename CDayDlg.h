@@ -2,9 +2,10 @@
 #include "afxdialogex.h"
 #include "CClientSocket.h" // 소켓 클래스 include
 #include <vector> // [추가] vector 사용
-#include "Mafia43Dlg.h"
+#include "SharedStructures.h" // 공유 구조체 정의
 
-struct RoomPlayerInfo;
+// Forward declarations
+class CClientSocket;
 
 // CDayDlg 대화 상자
 class CDayDlg : public CDialogEx
