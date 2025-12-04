@@ -695,6 +695,8 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 				nightPlayer.alive = roomPlayer.bIsAlive;
 				nightPlayers.push_back(nightPlayer);
 			}
+
+			
 		}
 
 		// [수정] CNightDlg를 새로운 생성자(nightPlayers)로 인스턴스화
@@ -708,6 +710,12 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 		m_Socket.m_pDlg = &dlgNight;
 
 		INT_PTR nResponse = dlgNight.DoModal();
+
+		if (nResponse == IDABORT)
+		{
+			PostQuitMessage(0); // 프로그램 완전 종료 요청
+			return 0;           // 함수 탈출
+		}
 
 		if (nResponse != IDOK) { bGameInProgress = false; break; }
 
@@ -725,6 +733,14 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 
 		nResponse = dlgDay.DoModal();
 
+		// ▼▼▼ [추가] 낮에 죽어서 IDABORT가 반환되면 프로그램 종료 ▼▼▼
+		if (nResponse == IDABORT)
+		{
+			PostQuitMessage(0); // 프로그램 완전 종료 요청
+			return 0;           // 함수 탈출
+		}
+		// ▲▲▲
+
 		if (nResponse != IDOK) { bGameInProgress = false; break; }
 	}
 
@@ -734,7 +750,7 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 
 	m_strMyRole = _T("");
 	m_strRoomID = _T("");
-	m_staticRoomInfo.SetWindowText(_T("게임 종료. 방을 선택하세요."));
+	m_staticRoomInfo.SetWindowText(_T("게임 종료."));
 
 	GetDlgItem(IDC_BTN_CREATE_ROOM)->EnableWindow(TRUE);
 	GetDlgItem(IDC_BTN_JOIN_ROOM)->EnableWindow(TRUE);

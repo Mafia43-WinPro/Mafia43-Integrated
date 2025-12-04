@@ -287,8 +287,8 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 			if (strVictim == m_strMyUID)
 			{
 				KillTimer(1); // 타이머 멈춤
-				AfxMessageBox(_T("마피아에게 습격당해 사망했습니다... 로비로 돌아갑니다."));
-				EndDialog(IDCANCEL); // ★ 로비로 강제 퇴장
+				AfxMessageBox(_T("마피아에게 습격당해 사망했습니다... 프로그램을 종료합니다."));
+				EndDialog(IDABORT); // ★ 로비로 강제 퇴장
 				return 0;
 			}
 			else

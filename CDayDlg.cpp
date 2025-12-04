@@ -65,8 +65,10 @@ BOOL CDayDlg::OnInitDialog()
 	// 죽었는지 확인
 	for (const auto& p : m_vecDayPlayers) {
 		if (p.strUID == m_strMyUID && !p.bIsAlive) {
-			AfxMessageBox(_T("마피아에게 습격당해 사망했습니다... 로비로 이동합니다."));
-			OnCancel();
+			// ▼▼▼ [수정] ▼▼▼
+			AfxMessageBox(_T("사망 상태입니다. 프로그램을 종료합니다."));
+			EndDialog(IDABORT); // 로비 이동(OnCancel) 대신 프로그램 종료 신호(IDABORT) 전송
+			// ▲▲▲
 			return TRUE;
 		}
 	}
@@ -226,8 +228,8 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 		if (!strVictim.IsEmpty()) {
 			if (m_strMyUID == strVictim || m_strMyNickname.Find(strVictim) != -1) {
 				KillTimer(1);
-				AfxMessageBox(_T("투표로 처형되었습니다... 로비로 이동합니다."));
-				OnCancel();
+				AfxMessageBox(_T("투표로 처형되었습니다. 프로그램을 종료합니다."));
+				EndDialog(IDABORT); // 프로그램 종료 신호 전송
 				return;
 			}
 
