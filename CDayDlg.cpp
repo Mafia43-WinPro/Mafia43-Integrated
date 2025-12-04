@@ -1,6 +1,7 @@
 ﻿// CDayDlg.cpp : 구현 파일
 #include "pch.h"
 #include "Mafia43.h"
+#include "Mafia43Dlg.h"
 #include "CDayDlg.h"
 #include "afxdialogex.h"
 #include "SharedStructures.h"

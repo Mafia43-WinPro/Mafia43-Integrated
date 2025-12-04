@@ -187,7 +187,6 @@ void CNightDlg::OnBnClickedConfirm()
 	int item = m_playerList.GetNextItem(-1, LVNI_SELECTED);
 	CString targetUID = _T("");
 	CString targetName = _T("");
-	CString targetUID = _T(""); //  보낼 ID
 
 	// 리스트에서 선택한 항목의 인덱스를 가져와서 UID 찾기
 	if (item != -1) {
