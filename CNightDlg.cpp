@@ -318,7 +318,7 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 				// 2) 다른 사람이 죽었음 -> 내 내부 데이터에서 그 사람을 '사망' 처리
 				for (auto& p : m_players)
 				{
-					if (p.uid == strVictim) // UID로 비교
+					if (p.strUID == strVictim) // UID로 비교
 					{
 						p.alive = false;
 						break;
