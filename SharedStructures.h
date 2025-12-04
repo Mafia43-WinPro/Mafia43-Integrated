@@ -10,18 +10,18 @@
 struct RoomPlayerInfo {
 	CString strUID;
 	CString strName;
-	int nPlayerNumber;  // 서버에서 할당한 플레이어 번호 (1, 2, 3...)
-	bool bIsAlive;
-	bool bIsHost;
+	int nPlayerNumber = 0;  // 서버에서 할당한 플레이어 번호 (1, 2, 3...)
+	bool bIsAlive = true;
+	bool bIsHost = false;
 };
 
 // Player information structure used in night phase
 struct PlayerInfo {
-	int id;
-	int nPlayerNumber;  // 플레이어 번호
+	int id = 0;
+	int nPlayerNumber = 0;  // 플레이어 번호
 	CString strUID;     // 서버로 보낼 UID
 	CString name;
-	bool alive;
+	bool alive = true;
 };
 
 #endif // SHARED_STRUCTURES_H

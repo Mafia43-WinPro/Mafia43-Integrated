@@ -559,10 +559,11 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 
 		// 2-1) [추가] Player Number 추출
 		int nPlayerNumber = 0;
+
+		// 방법 1: "number" 필드에서 추출
 		int kNumber = strPlayerObj.Find("\"number\"");
 		if (kNumber != -1) {
 			int c = strPlayerObj.Find(':', kNumber);
-			// 숫자 파싱 (다음 쉼표나 }까지)
 			CStringA numStr = strPlayerObj.Mid(c + 1);
 			numStr.Trim();
 			int endPos = numStr.FindOneOf(",}");
@@ -570,6 +571,19 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 				numStr = numStr.Left(endPos);
 				numStr.Trim();
 				nPlayerNumber = atoi(numStr);
+			}
+		}
+
+		// 방법 2: "number" 필드가 없으면 "name"에서 "Player X" 형식 파싱
+		if (nPlayerNumber == 0 && !strName.IsEmpty()) {
+			// "Player 17" 형식에서 숫자 추출
+			int playerPos = strName.Find("Player");
+			if (playerPos != -1) {
+				CStringA numPart = strName.Mid(playerPos + 6); // "Player" 다음부터
+				numPart.Trim(); // 공백 제거
+				if (!numPart.IsEmpty()) {
+					nPlayerNumber = atoi(numPart);
+				}
 			}
 		}
 
