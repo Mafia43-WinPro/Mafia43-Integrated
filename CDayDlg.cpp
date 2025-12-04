@@ -333,98 +333,81 @@ void CDayDlg::ParseChat(const CStringA& strJsonA)
 	}
 }
 
+// CDayDlg.cpp
+
 void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 {
 	m_vecDayPlayers.clear();
 
-	const char* pData = strJsonA.GetString();
-	const char* pPlayer = strstr(pData, "\"uid\": \"");
+	// 1. players 배열이 시작되는 위치를 찾거나, 그냥 전체에서 검색
+	// (간단하게 전체 문자열을 순회하며 { } 객체를 찾습니다)
+	int nSearchPos = strJsonA.Find("\"players\"");
+	if (nSearchPos == -1) nSearchPos = 0;
 
-	while (pPlayer)
+	while (true)
 	{
-		const char* pObjEnd = strchr(pPlayer, '}');
-		if (!pObjEnd) break;
+		// 2. 객체의 시작({)과 끝(})을 찾음
+		int nObjStart = strJsonA.Find('{', nSearchPos);
+		if (nObjStart == -1) break; // 더 이상 객체가 없음
 
-		CStringA strPlayerObj(pPlayer, pObjEnd - pPlayer + 1);
+		int nObjEnd = strJsonA.Find('}', nObjStart);
+		if (nObjEnd == -1) break; // 닫는 괄호가 없으면 종료
 
+		// 3. 플레이어 한 명분의 데이터 추출
+		CStringA strPlayerObj = strJsonA.Mid(nObjStart, nObjEnd - nObjStart + 1);
+
+		// 다음 검색 위치를 현재 객체 뒤로 이동
+		nSearchPos = nObjEnd + 1;
+
+		// ★★★ [핵심] 작성해두신 안전한 헬퍼 함수를 사용합니다 ★★★
+		// 이 함수는 공백, 줄바꿈을 다 제거하고 값을 뽑아주므로 아주 안전합니다.
+		CStringA strUid = ExtractJsonStringField(strPlayerObj, "uid");
+		CStringA strName = ExtractJsonStringField(strPlayerObj, "name");
+
+		// UID가 없으면 유효하지 않은 데이터이므로 건너뜀
+		if (strUid.IsEmpty()) continue;
+
+		// 4. 생존 여부 및 방장 여부 확인 (간단 파싱)
+		// 공백 제거된 버전으로 검사
 		CStringA strCleanObj = strPlayerObj;
 		strCleanObj.Replace(" ", "");
 		strCleanObj.Replace("\t", "");
 		strCleanObj.Replace("\r", "");
 		strCleanObj.Replace("\n", "");
 
-		CStringA strUid = "";
-		int kUid = strPlayerObj.Find("\"uid\"");
-		if (kUid != -1) {
-			int c = strPlayerObj.Find(':', kUid);
-			int s = strPlayerObj.Find('\"', c + 1);
-			int e = strPlayerObj.Find('\"', s + 1);
-			if (s != -1 && e != -1)
-			{
-				strUid = strPlayerObj.Mid(s + 1, e - s - 1);
-
-				strUid.Trim();
-			}
-		}
-
-		CStringA strName = "";
-		int kName = strPlayerObj.Find("\"name\"");
-		if (kName != -1) {
-			int c = strPlayerObj.Find(':', kName);
-			int s = strPlayerObj.Find('\"', c + 1);
-			int e = strPlayerObj.Find('\"', s + 1);
-			if (s != -1 && e != -1)
-			{
-				strName = strPlayerObj.Mid(s + 1, e - s - 1);
-
-				strUid.Trim();
-			}
-		}
-
-		// Player Number 추출
-		int nPlayerNumber = 0;
-
-		// 방법 1: "number" 필드에서 추출
-		int kNumber = strPlayerObj.Find("\"number\"");
-		if (kNumber != -1) {
-			int c = strPlayerObj.Find(':', kNumber);
-			CStringA numStr = strPlayerObj.Mid(c + 1);
-			numStr.Trim();
-			int endPos = numStr.FindOneOf(",}");
-			if (endPos != -1) {
-				numStr = numStr.Left(endPos);
-				numStr.Trim();
-				nPlayerNumber = atoi(numStr);
-			}
-		}
-
-		// 방법 2: "number" 필드가 없으면 "name"에서 "Player X" 형식 파싱
-		if (nPlayerNumber == 0 && !strName.IsEmpty()) {
-			int playerPos = strName.Find("Player");
-			if (playerPos != -1) {
-				CStringA numPart = strName.Mid(playerPos + 6); // "Player" 다음부터
-				numPart.Trim();
-				if (!numPart.IsEmpty()) {
-					nPlayerNumber = atoi(numPart);
-				}
-			}
-		}
-
 		bool bAlive = (strCleanObj.Find("\"alive\":true") != -1);
 		bool bIsHost = (strCleanObj.Find("\"is_host\":true") != -1);
 
+		// 5. 플레이어 번호 추출
+		int nPlayerNumber = 0;
+		int kNumber = strCleanObj.Find("\"number\":");
+		if (kNumber != -1) {
+			// "number":123,... 형태 파싱
+			CStringA sNum = strCleanObj.Mid(kNumber + 9); // "number": 길이만큼 이동
+			nPlayerNumber = atoi(sNum);
+		}
+
+		// 번호가 없으면 이름에서 파싱 (Player 1 형태)
+		if (nPlayerNumber == 0) {
+			CString tempName = CStrA_to_CStr(strName);
+			int pPos = tempName.Find(_T("Player"));
+			if (pPos != -1) {
+				nPlayerNumber = _ttoi(tempName.Mid(pPos + 6));
+			}
+		}
+
+		// 6. 데이터 저장
 		RoomPlayerInfo player;
-		player.strUID = CStrA_to_CStr(strUid);
+		player.strUID = CStrA_to_CStr(strUid); // Extract함수가 이미 Trim된 값을 줌
 		player.strName = CStrA_to_CStr(strName);
-		player.nPlayerNumber = nPlayerNumber;  // 플레이어 번호 저장
+		player.nPlayerNumber = nPlayerNumber;
 		player.bIsAlive = bAlive;
 		player.bIsHost = bIsHost;
 
 		m_vecDayPlayers.push_back(player);
-
-		pPlayer = strstr(pObjEnd, "\"uid\": \"");
 	}
 
+	// ★★★ [필수] 부모 창(메인)의 데이터 갱신 ★★★
 	CMafia43Dlg* pMain = dynamic_cast<CMafia43Dlg*>(GetParent());
 	if (pMain)
 	{
