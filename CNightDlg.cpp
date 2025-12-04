@@ -282,19 +282,41 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	if (strJson.Find("\"op\": \"NIGHT_RESULT\"") != -1)
 	{
 		CString strVictim = _T("");
+		int nVictimNumber = 0;
+
+		// victim UID 파싱
 		int nVic = strJson.Find("\"victim\": \"");
 		if (nVic != -1) {
 			CStringA sVal = strJson.Mid(nVic + 11);
 			sVal = sVal.Left(sVal.Find('\"'));
-			strVictim = CString(CA2T(sVal)); // 여기에는 죽은 사람 UID가 들어옴
+			strVictim = CString(CA2T(sVal));
 		}
+
+		// victim_number 파싱
+		int nVicNum = strJson.Find("\"victim_number\"");
+		if (nVicNum != -1) {
+			int c = strJson.Find(':', nVicNum);
+			CStringA numStr = strJson.Mid(c + 1);
+			numStr.Trim();
+			int endPos = numStr.FindOneOf(",}");
+			if (endPos != -1) {
+				numStr = numStr.Left(endPos);
+				numStr.Trim();
+				nVictimNumber = atoi(numStr);
+			}
+		}
+
 		bool bSaved = (strJson.Find("\"saved\": true") != -1);
 
 		if (!strVictim.IsEmpty() && !bSaved) {
-			// 여기서는 누가 죽었는지만 알림 (UID로 옴)
-			// 실제 퇴장은 낮 화면(CDayDlg) 진입 시 처리
+			// Player{number} 형식으로 표시
 			CString msg;
-			msg.Format(_T("[속보] 누군가(%s) 습격당했습니다.\r\n"), strVictim);
+			msg.Format(_T("[속보] Player%d 님이 마피아에게 습격당했습니다.\r\n"), nVictimNumber);
+			AppendChat(msg);
+		}
+		else if (!strVictim.IsEmpty() && bSaved) {
+			CString msg;
+			msg.Format(_T("[알림] Player%d 님이 의사에게 보호받았습니다.\r\n"), nVictimNumber);
 			AppendChat(msg);
 		}
 	}

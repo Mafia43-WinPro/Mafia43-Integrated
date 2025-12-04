@@ -10,6 +10,7 @@
 struct RoomPlayerInfo {
 	CString strUID;
 	CString strName;
+	int nPlayerNumber;  // 서버에서 할당한 플레이어 번호 (1, 2, 3...)
 	bool bIsAlive;
 	bool bIsHost;
 };
@@ -17,6 +18,7 @@ struct RoomPlayerInfo {
 // Player information structure used in night phase
 struct PlayerInfo {
 	int id;
+	int nPlayerNumber;  // 플레이어 번호
 	CString name;
 	bool alive;
 };

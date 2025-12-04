@@ -87,8 +87,12 @@ void CDayDlg::PopulateVoteList()
 	{
 		if (player.bIsAlive)
 		{
+			// Player{number} 형식으로 표시
+			CString strDisplayName;
+			strDisplayName.Format(_T("Player%d"), player.nPlayerNumber);
+
 			m_listVote.InsertItem(nItem, player.strUID);
-			m_listVote.SetItemText(nItem, 1, player.strName);
+			m_listVote.SetItemText(nItem, 1, strDisplayName);
 			m_listVote.SetItemText(nItem, 2, _T("생존"));
 			nItem++;
 		}
@@ -177,11 +181,28 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 	else if (strJsonA.Find("\"op\": \"DAY_RESULT\"") != -1)
 	{
 		CString strVictim = _T("");
+		int nVictimNumber = 0;
+
+		// victim UID 파싱
 		int nVic = strJsonA.Find("\"victim\": \"");
 		if (nVic != -1) {
 			CStringA sVal = strJsonA.Mid(nVic + 11);
 			sVal = sVal.Left(sVal.Find('\"'));
 			strVictim = CString(CA2T(sVal));
+		}
+
+		// victim_number 파싱
+		int nVicNum = strJsonA.Find("\"victim_number\"");
+		if (nVicNum != -1) {
+			int c = strJsonA.Find(':', nVicNum);
+			CStringA numStr = strJsonA.Mid(c + 1);
+			numStr.Trim();
+			int endPos = numStr.FindOneOf(",}");
+			if (endPos != -1) {
+				numStr = numStr.Left(endPos);
+				numStr.Trim();
+				nVictimNumber = atoi(numStr);
+			}
 		}
 
 		if (!strVictim.IsEmpty()) {
@@ -192,8 +213,8 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 				return;
 			}
 			CString msg;
-			// [수정] (LPCTSTR) 캐스팅 추가
-			msg.Format(_T("[속보] %s 님이 처형되었습니다.\r\n"), (LPCTSTR)strVictim);
+			// Player{number} 형식으로 표시
+			msg.Format(_T("[속보] Player%d 님이 처형되었습니다.\r\n"), nVictimNumber);
 			AppendTextToRichEdit(msg, RGB(255, 0, 0));
 		}
 		else {
@@ -228,15 +249,29 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 
 void CDayDlg::ParseChat(const CStringA& strJsonA)
 {
-	int nFrom = strJsonA.Find("\"from\": \"");
+	// from_number 필드 파싱
+	int nFromNumber = 0;
+	int nFromNumPos = strJsonA.Find("\"from_number\"");
+	if (nFromNumPos != -1) {
+		int c = strJsonA.Find(':', nFromNumPos);
+		CStringA numStr = strJsonA.Mid(c + 1);
+		numStr.Trim();
+		int endPos = numStr.FindOneOf(",}");
+		if (endPos != -1) {
+			numStr = numStr.Left(endPos);
+			numStr.Trim();
+			nFromNumber = atoi(numStr);
+		}
+	}
+
 	int nText = strJsonA.Find("\"text\": \"");
-	if (nFrom != -1 && nText != -1) {
-		CStringA sFrom = strJsonA.Mid(nFrom + 9); sFrom = sFrom.Left(sFrom.Find('\"'));
-		CStringA sText = strJsonA.Mid(nText + 9); sText = sText.Left(sText.Find('\"'));
+	if (nText != -1) {
+		CStringA sText = strJsonA.Mid(nText + 9);
+		sText = sText.Left(sText.Find('\"'));
 
 		CString msg;
-		// [수정] (LPCTSTR) 캐스팅 추가
-		msg.Format(_T("%s: %s"), (LPCTSTR)CStrA_to_CStr(sFrom), (LPCTSTR)CStrA_to_CStr(sText));
+		// Player{number} 형식으로 표시
+		msg.Format(_T("Player%d: %s"), nFromNumber, (LPCTSTR)CStrA_to_CStr(sText));
 		AppendTextToRichEdit(msg);
 	}
 }

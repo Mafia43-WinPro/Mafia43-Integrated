@@ -557,6 +557,22 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 			if (s != -1 && e != -1) strName = strPlayerObj.Mid(s + 1, e - s - 1);
 		}
 
+		// 2-1) [추가] Player Number 추출
+		int nPlayerNumber = 0;
+		int kNumber = strPlayerObj.Find("\"number\"");
+		if (kNumber != -1) {
+			int c = strPlayerObj.Find(':', kNumber);
+			// 숫자 파싱 (다음 쉼표나 }까지)
+			CStringA numStr = strPlayerObj.Mid(c + 1);
+			numStr.Trim();
+			int endPos = numStr.FindOneOf(",}");
+			if (endPos != -1) {
+				numStr = numStr.Left(endPos);
+				numStr.Trim();
+				nPlayerNumber = atoi(numStr);
+			}
+		}
+
 		// 3) Alive 추출 (기존 로직 유지)
 		CStringA strAlive = "false";
 		if (strCleanObj.Find("\"alive\":true") != -1) strAlive = "true";
@@ -572,13 +588,16 @@ void CMafia43Dlg::ParseRoomState(const CStringA& strJsonA)
 		RoomPlayerInfo player;
 		player.strUID = CStrA_to_CStr(strUid);
 		player.strName = CStrA_to_CStr(strName);
+		player.nPlayerNumber = nPlayerNumber;  // 플레이어 번호 저장
 		player.bIsAlive = (strAlive == "true");
 		player.bIsHost = (strIsHost == "true");
 		m_vecRoomPlayers.push_back(player);
 
-
 		// --- 리스트 추가 --- (로비 화면 리스트 업데이트)
-		m_listPlayersInRoom.InsertItem(nItem, CStrA_to_CStr(strName));
+		// Player{number} 형식으로 표시
+		CString strDisplayName;
+		strDisplayName.Format(_T("Player%d"), nPlayerNumber);
+		m_listPlayersInRoom.InsertItem(nItem, strDisplayName);
 		m_listPlayersInRoom.SetItemText(nItem, 1, (strAlive == "true" ? _T("생존") : _T("사망")));
 
 		// --- 방장 확인 및 버튼 활성화 --- (기존 로직 유지)
@@ -642,9 +661,8 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 	{
 		// --- 밤 페이즈 ---
 
-		// [추가] CNightDlg에 전달할 플레이어 목록 (UID만 포함) 생성
+		// [추가] CNightDlg에 전달할 플레이어 목록 생성
 		std::vector<PlayerInfo> nightPlayers;
-		int tempIdCounter = 1;
 		for (const auto& roomPlayer : m_vecRoomPlayers)
 		{
 			// [핵심] 살아있는 플레이어만 목록에 포함
@@ -652,10 +670,13 @@ LRESULT CMafia43Dlg::OnGameStart(WPARAM wParam, LPARAM lParam)
 			{
 				PlayerInfo nightPlayer;
 				// CNightDlg의 PlayerInfo 구조체에 맞춰 데이터 변환
-				nightPlayer.id = tempIdCounter++;
+				nightPlayer.id = roomPlayer.nPlayerNumber;  // 서버 플레이어 번호 사용
+				nightPlayer.nPlayerNumber = roomPlayer.nPlayerNumber;
 
-				// [핵심] CNightDlg의 name 필드에 UID 문자열을 저장하여 리스트에 표시되도록 합니다.
-				nightPlayer.name = roomPlayer.strName;
+				// Player{number} 형식으로 이름 생성
+				CString strDisplayName;
+				strDisplayName.Format(_T("Player%d"), roomPlayer.nPlayerNumber);
+				nightPlayer.name = strDisplayName;
 				nightPlayer.alive = roomPlayer.bIsAlive;
 				nightPlayers.push_back(nightPlayer);
 			}
