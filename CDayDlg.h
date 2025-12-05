@@ -49,6 +49,8 @@ protected:
 	CStringA CStr_to_CStrA(const CString& strT);
 	CString CStrA_to_CStr(const CStringA& strA);
 
+	CStringA EscapeJsonString(const CStringA& str);
+
 public:
 	// --- 멤버 변수 (그대로 유지) ---
 	CClientSocket* m_pSocket;
