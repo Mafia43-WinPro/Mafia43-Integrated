@@ -129,14 +129,17 @@ void CDayDlg::OnTimer(UINT_PTR nIDEvent)
 		}
 		else {
 			KillTimer(1);
-			AppendTextToRichEdit(_T("[알림] 토론 시간이 종료되었습니다. 투표 집계 중...\r\n"), RGB(255, 0, 0));
+			AppendTextToRichEdit(_T("[알림] 토론 시간이 종료되었습니다.\r\n"), RGB(255, 0, 0));
 			GetDlgItem(IDC_BUTTON_VOTE)->EnableWindow(FALSE);
 
-			bool bAmIHost = false;
-			for (const auto& p : m_vecDayPlayers) {
-				if (p.strUID == m_strMyUID && p.bIsHost) { bAmIHost = true; break; }
+			// 투표를 안 했으면 기권(SKIP) 투표 전송
+			if (!m_bVoteSubmitted && m_pSocket) {
+				m_pSocket->SendJson("{\"op\":\"DAY_VOTE\", \"target\":\"SKIP\"}");
+				m_bVoteSubmitted = true;
+				AppendTextToRichEdit(_T("[알림] 시간 초과로 기권 처리되었습니다.\r\n"), RGB(128, 128, 128));
 			}
-			RequestPhaseChange(true);
+			// NEXT_PHASE를 보내지 않음 - 서버가 모든 플레이어 투표를 받으면 자동 전환
+			AppendTextToRichEdit(_T("[알림] 다른 플레이어들을 기다리는 중...\r\n"), RGB(128, 128, 128));
 		}
 	}
 	CDialogEx::OnTimer(nIDEvent);
@@ -164,9 +167,8 @@ void CDayDlg::OnBnClickedButtonSendChat()
 	UpdateData(TRUE);
 	if (m_strChatMsg.IsEmpty() || !m_pSocket) return;
 
-	CStringA escapedText = EscapeJsonString(CStr_to_CStrA(m_strChatMsg));
 	CStringA strJson;
-	strJson.Format("{\"op\":\"DAY_CHAT\", \"text\":\"%s\"}", (LPCSTR)escapedText);
+	strJson.Format("{\"op\":\"DAY_CHAT\", \"text\":\"%s\"}", (LPCSTR)CStr_to_CStrA(m_strChatMsg));
 	m_pSocket->SendJson(strJson);
 
 	m_strChatMsg = _T(""); UpdateData(FALSE); GetDlgItem(IDC_EDIT_CHAT)->SetFocus();
@@ -191,6 +193,7 @@ void CDayDlg::OnBnClickedButtonVote()
 		CStringA strJson;
 		strJson.Format("{\"op\":\"DAY_VOTE\", \"target\":\"%s\"}", (LPCSTR)CStr_to_CStrA(strTargetUID));
 		m_pSocket->SendJson(strJson);
+		m_bVoteSubmitted = true;
 		GetDlgItem(IDC_BUTTON_VOTE)->EnableWindow(FALSE);
 		AppendTextToRichEdit(_T("[알림] 투표를 완료했습니다.\r\n"), RGB(0, 0, 255));
 	}
@@ -297,13 +300,6 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 
 void CDayDlg::ParseChat(const CStringA& strJsonA)
 {
-	// 디버깅: JSON 원본 출력 (프로그램 실행 폴더에 저장)
-	FILE* fp = nullptr;
-	if (fopen_s(&fp, "chat_debug.txt", "a") == 0 && fp) {
-		fprintf(fp, "=== Received JSON ===\n%s\n\n", strJsonA.GetString());
-		fclose(fp);
-	}
-
 	// 플레이어 번호 추출
 	int nFromNumber = 0;
 	int nFromNumPos = strJsonA.Find("\"from_number\"");
@@ -320,34 +316,10 @@ void CDayDlg::ParseChat(const CStringA& strJsonA)
 	}
 
 	// 텍스트 추출
-	CStringA sText = "";
 	int nText = strJsonA.Find("\"text\": \"");
 	if (nText != -1) {
-		sText = strJsonA.Mid(nText + 9);  // "text": " 다음부터
-	} else {
-		nText = strJsonA.Find("\"text\":\"");  // 공백 없는 경우
-		if (nText != -1) {
-			sText = strJsonA.Mid(nText + 8);  // "text":" 다음부터
-		}
-	}
-
-	if (!sText.IsEmpty()) {
-		// UTF-8 바이트를 바이트 레벨에서 검색 (strchr 사용)
-		const char* pText = sText.GetString();
-		const char* pQuote = strchr(pText, '\"');
-
-		if (pQuote == nullptr) {
-			// 닫는 따옴표를 못 찾음 - 파싱 에러
-			FILE* fp = nullptr;
-			if (fopen_s(&fp, "chat_debug.txt", "a") == 0 && fp) {
-				fprintf(fp, "[ERROR] Cannot find closing quote in: %s\n\n", sText.GetString());
-				fclose(fp);
-			}
-			return;  // 에러 발생 시 메시지 표시 안 함
-		}
-
-		int nEnd = (int)(pQuote - pText);
-		sText = sText.Left(nEnd);
+		CStringA sText = strJsonA.Mid(nText + 9);
+		sText = sText.Left(sText.Find('\"'));
 
 		CString msg;
 		if (nFromNumber > 0)
@@ -427,34 +399,6 @@ void CDayDlg::ParseVoteResult(const CStringA& strJsonA) {}
 
 CStringA CDayDlg::CStr_to_CStrA(const CString& strT) { CT2A utf8(strT, CP_UTF8); return CStringA(utf8); }
 CString CDayDlg::CStrA_to_CStr(const CStringA& strA) { CA2T utf8(strA, CP_UTF8); return CString(utf8); }
-
-CStringA CDayDlg::EscapeJsonString(const CStringA& str)
-{
-	CStringA result;
-	for (int i = 0; i < str.GetLength(); i++) {
-		unsigned char c = (unsigned char)str[i];  // unsigned로 처리!
-		switch (c) {
-		case '\"': result += "\\\""; break;
-		case '\\': result += "\\\\"; break;
-		case '\b': result += "\\b"; break;
-		case '\f': result += "\\f"; break;
-		case '\n': result += "\\n"; break;
-		case '\r': result += "\\r"; break;
-		case '\t': result += "\\t"; break;
-		default:
-			if (c < 0x20) {
-				// 제어 문자는 \uXXXX 형태로
-				CStringA hex;
-				hex.Format("\\u%04x", c);
-				result += hex;
-			}
-			else {
-				result += (char)c;  // 다시 char로 변환하여 추가
-			}
-		}
-	}
-	return result;
-}
 
 CStringA CDayDlg::ExtractJsonStringField(const CStringA& json, const CStringA& fieldName)
 {
