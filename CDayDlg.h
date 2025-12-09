@@ -49,8 +49,6 @@ protected:
 	CStringA CStr_to_CStrA(const CString& strT);
 	CString CStrA_to_CStr(const CStringA& strA);
 
-	CStringA EscapeJsonString(const CStringA& str);
-
 public:
 	// --- 멤버 변수 (그대로 유지) ---
 	CClientSocket* m_pSocket;
@@ -58,9 +56,10 @@ public:
 	CString m_strMyNickname;
 	CString m_strMyRole;
 
-	// --- [추가] 타이머 멤버 변수 ---
+	// --- [추가] 타이머 및 투표 멤버 변수 ---
 	int m_nDayTimeLimit; // 남은 시간 (초)
 	bool m_bNextPhaseRequested = false;
+	bool m_bVoteSubmitted = false; // 투표 제출 여부
 
 	std::vector<RoomPlayerInfo> m_vecDayPlayers;
 
