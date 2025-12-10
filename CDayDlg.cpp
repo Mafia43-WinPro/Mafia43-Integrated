@@ -318,25 +318,27 @@ void CDayDlg::ParseChat(const CStringA& strJsonA)
 	// 텍스트 추출
 	int nText = strJsonA.Find("\"text\": \"");
 	if (nText != -1) {
-	    CStringA sText = strJsonA.Mid(nText + 9);
-	    
-	    // CStringA::Find 대신 strchr 사용 (바이트 레벨 검색)
-	    const char* pText = sText.GetString();
-	    const char* pQuote = strchr(pText, '\"');
-	    
-	    if (pQuote != nullptr) {
-	        int nEnd = (int)(pQuote - pText);
-	        sText = sText.Left(nEnd);
-	
-	        CString msg;
-	        if (nFromNumber > 0)
-	            msg.Format(_T("Player%d: %s"), nFromNumber, (LPCTSTR)CStrA_to_CStr(sText));
-	        else
-	            msg.Format(_T("Unknown: %s"), (LPCTSTR)CStrA_to_CStr(sText));
-	
-	        AppendTextToRichEdit(msg);
-	    }
+		CStringA sText = strJsonA.Mid(nText + 9);
+
+		// CStringA::Find 대신 strchr 사용 (바이트 레벨 검색)
+		const char* pText = sText.GetString();
+		const char* pQuote = strchr(pText, '\"');
+
+		if (pQuote != nullptr) {
+			int nEnd = (int)(pQuote - pText);
+			sText = sText.Left(nEnd);
+
+			CString msg;
+			if (nFromNumber > 0)
+				msg.Format(_T("Player%d: %s"), nFromNumber, (LPCTSTR)CStrA_to_CStr(sText));
+			else
+				msg.Format(_T("Unknown: %s"), (LPCTSTR)CStrA_to_CStr(sText));
+
+			AppendTextToRichEdit(msg);
+		}
 	}
+}
+
 
 void CDayDlg::ParseRoomState(const CStringA& strJsonA)
 {
