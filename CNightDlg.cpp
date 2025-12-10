@@ -311,37 +311,45 @@ LRESULT CNightDlg::OnReceiveMsg(WPARAM wParam, LPARAM lParam)
 	// 3. 채팅
 	else if (strJson.Find("\"op\": \"CHAT\"") != -1 || strJson.Find("\"op\": \"MAFIA_CHAT\"") != -1)
 	{
-		CString text = _T("");
-		int nText = strJson.Find("\"text\": \"");
-		if (nText != -1) {
-			CStringA sText = strJson.Mid(nText + 9);
-			int nEnd = sText.Find('\"');
-			if (nEnd != -1) sText = sText.Left(nEnd);
-			text = CString(CA2T(sText, CP_UTF8));
-		}
-
-		// 플레이어 번호 추출
-		int playerNum = 0;
-		int nNum = strJson.Find("\"from_number\":");
-		if (nNum != -1) {
-			CStringA sNum = strJson.Mid(nNum + 14);
-			sNum.Trim();
-			int nComma = sNum.Find(',');
-			int nBrace = sNum.Find('}');
-			int nEnd = (nComma != -1 && (nBrace == -1 || nComma < nBrace)) ? nComma : nBrace;
-			if (nEnd != -1) {
-				sNum = sNum.Left(nEnd);
-				playerNum = atoi(sNum);
-			}
-		}
-
-		CString msg;
-		if (playerNum > 0)
-			msg.Format(_T("Player%d: %s\r\n"), playerNum, (LPCTSTR)text);
-		else
-			msg.Format(_T("Unknown: %s\r\n"), (LPCTSTR)text);
-		AppendChat(msg);
+	    CString text = _T("");
+	    int nText = strJson.Find("\"text\": \"");
+	    if (nText != -1) {
+	        CStringA sText = strJson.Mid(nText + 9);
+	        
+	        // CStringA::Find 대신 strchr 사용 (바이트 레벨 검색)
+	        const char* pText = sText.GetString();
+	        const char* pQuote = strchr(pText, '\"');
+	        
+	        if (pQuote != nullptr) {
+	            int nEnd = (int)(pQuote - pText);
+	            sText = sText.Left(nEnd);
+	            text = CString(CA2T(sText, CP_UTF8));
+	        }
+	    }
+	
+	    // 플레이어 번호 추출
+	    int playerNum = 0;
+	    int nNum = strJson.Find("\"from_number\":");
+	    if (nNum != -1) {
+	        CStringA sNum = strJson.Mid(nNum + 14);
+	        sNum.Trim();
+	        int nComma = sNum.Find(',');
+	        int nBrace = sNum.Find('}');
+	        int nEnd = (nComma != -1 && (nBrace == -1 || nComma < nBrace)) ? nComma : nBrace;
+	        if (nEnd != -1) {
+	            sNum = sNum.Left(nEnd);
+	            playerNum = atoi(sNum);
+	        }
+	    }
+	
+	    CString msg;
+	    if (playerNum > 0)
+	        msg.Format(_T("Player%d: %s\r\n"), playerNum, (LPCTSTR)text);
+	    else
+	        msg.Format(_T("Unknown: %s\r\n"), (LPCTSTR)text);
+	    AppendChat(msg);
 	}
+
 	// 4. 종료
 	else if (strJson.Find("\"op\": \"GAME_END\"") != -1)
 	{
