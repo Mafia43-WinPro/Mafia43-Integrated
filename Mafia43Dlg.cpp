@@ -231,7 +231,7 @@ void CMafia43Dlg::OnClickedButtonConnect()
 	
 	// [주의] 서버 컴퓨터의 IP 주소를 입력해야 합니다. (로컬 테스트 시 127.0.0.1)
 	// 기존에 입력하신 IP: 10.21.32.245
-	if (!m_Socket.Connect(_T("10.21.36.44"), 5566))
+	if (!m_Socket.Connect(_T("10.21.36.85"), 5566))
 	{
 		if (GetLastError() != WSAEWOULDBLOCK)
 		{
@@ -284,10 +284,10 @@ void CMafia43Dlg::OnClickedButtonStartGame()
 	}
 
 	// 디버깅: 전송할 메시지 확인
-	CString strDebug;
-	strDebug.Format(_T("[디버그] 전송: {\"op\":\"START\"}\n방 ID: %s"), m_strRoomID);
+	//CString strDebug;
+	//strDebug.Format(_T("[디버그] 전송: {\"op\":\"START\"}\n방 ID: %s"), m_strRoomID);
 
-	AfxMessageBox(strDebug);
+	//AfxMessageBox(strDebug);
 	m_Socket.SendJson("{\"op\":\"START\"}");
 	GetDlgItem(IDC_BTN_START_GAME)->EnableWindow(FALSE);
 }
