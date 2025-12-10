@@ -294,7 +294,7 @@ void CDayDlg::ProcessServerMessage(CStringA strJsonA)
 		EndDialog(IDABORT);
 	}
 	else if (strJsonA.Find("\"op\": \"ERROR\"") != -1) {
-		AfxMessageBox(CStrA_to_CStr(strJsonA));
+		//AfxMessageBox(CStrA_to_CStr(strJsonA));
 	}
 }
 
